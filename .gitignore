@@ -14,9 +14,11 @@ backend/venv/
 backend/__pycache__/
 backend/**/*.pyc
 backend/.pytest_cache/
+backend/instance/
 
 # Python cache
 __pycache__/
 *.py[cod]
+
 # Local run logs
 /*.log

@@ -11,6 +11,31 @@ services:
   backend:
     build:
       context: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://codex:80238023@db:5432/codex_pro1
     expose:
       - "5000"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: codex_pro1
+      POSTGRES_USER: codex
+      POSTGRES_PASSWORD: 80238023
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codex -d codex_pro1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

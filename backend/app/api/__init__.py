@@ -1,8 +1,9 @@
 from flask import Blueprint, jsonify
 
-api_bp = Blueprint("api", __name__)
+from app.extensions import db
+from app.models import DemoCounter
 
-_demo_click_count = 0
+api_bp = Blueprint("api", __name__)
 
 
 @api_bp.get("/health")
@@ -12,11 +13,13 @@ def health_check():
 
 @api_bp.get("/demo-click")
 def get_demo_click():
-    return jsonify(count=_demo_click_count, message="Ready for click test")
+    counter = db.session.get(DemoCounter, 1)
+    return jsonify(count=counter.count, message="Loaded from database")
 
 
 @api_bp.post("/demo-click")
 def increment_demo_click():
-    global _demo_click_count
-    _demo_click_count += 1
-    return jsonify(count=_demo_click_count, message="Click recorded")
+    counter = db.session.get(DemoCounter, 1)
+    counter.count += 1
+    db.session.commit()
+    return jsonify(count=counter.count, message="Click recorded in database")

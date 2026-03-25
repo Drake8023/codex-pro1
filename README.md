@@ -22,10 +22,11 @@ Backend:
 
 ```bash
 cd backend
+set DATABASE_URL=postgresql+psycopg://codex:80238023@127.0.0.1:5432/codex_pro1
 python -m flask --app wsgi:app run --host 127.0.0.1 --port 5000 --no-debugger --no-reload
 ```
 
-With both services running, open `http://127.0.0.1:5173`. The frontend will proxy `/api/*` requests to the Flask backend on port `5000`.
+With both services running, open `http://127.0.0.1:5173`. The frontend will proxy `/api/*` requests to the backend on port `5000`.
 
 ## Production-style deployment
 
@@ -37,9 +38,19 @@ This starts:
 
 - Nginx + static frontend on host port `5173`
 - Flask API behind the frontend container on internal port `5000`
+- PostgreSQL on server-local `127.0.0.1:5432`
 
 Public traffic goes through `http://<server-ip>:5173` on the frontend container, and `/api/*` requests are proxied to the backend service.
 
-## Notes
+## Database
 
-The project name, domain model, and fuller documentation are still evolving. This repository is set up as a shared frontend/backend starting point with a simple production-style container deployment.
+Default PostgreSQL settings used by Docker Compose:
+
+- Host inside Compose: `db`
+- Host on server: `127.0.0.1`
+- Port: `5432`
+- Database: `codex_pro1`
+- Username: `codex`
+- Password: `80238023`
+
+The backend reads `DATABASE_URL`. If it is not set, the app falls back to a local SQLite file for convenience.
