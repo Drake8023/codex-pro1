@@ -6,7 +6,7 @@ This repository contains both the frontend and backend for the project.
 
 - `frontend/`: React + Vite + TypeScript client
 - `backend/`: Flask API service
-- `docker-compose.yml`: local multi-service startup for the integrated app
+- `docker-compose.yml`: deployment entrypoint for the integrated app
 
 ## Local development
 
@@ -15,32 +15,31 @@ Frontend:
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev -- --host 127.0.0.1
 ```
 
 Backend:
 
 ```bash
 cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python wsgi.py
+python -m flask --app wsgi:app run --host 127.0.0.1 --port 5000 --no-debugger --no-reload
 ```
 
-With both services running, open `http://localhost:5173`. The frontend will proxy `/api/*` requests to the Flask backend on port `5000`.
+With both services running, open `http://127.0.0.1:5173`. The frontend will proxy `/api/*` requests to the Flask backend on port `5000`.
 
-## Docker-based startup
+## Production-style deployment
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 This starts:
 
-- frontend on `http://localhost:5173`
-- backend on `http://localhost:5000`
+- Nginx + static frontend on host port `5173`
+- Flask API behind the frontend container on internal port `5000`
+
+Public traffic goes through `http://<server-ip>:5173` on the frontend container, and `/api/*` requests are proxied to the backend service.
 
 ## Notes
 
-The project name, domain model, and fuller documentation are still evolving. This repository is now set up as a shared frontend/backend starting point so feature work and deployment hardening can continue from a single place.
+The project name, domain model, and fuller documentation are still evolving. This repository is set up as a shared frontend/backend starting point with a simple production-style container deployment.
