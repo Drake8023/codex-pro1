@@ -8,4 +8,12 @@ The initial structure is intentionally small and ready for later expansion:
 - `app/api/` contains versioned API routes
 - `wsgi.py` is the production entrypoint
 
-The frontend and backend are developed together in this repository, and the final project name and broader documentation will be refined later.
+Current API shape:
+
+- `GET /api/health`
+- `GET /api/modes/state`
+- `POST /api/modes/longing`
+- `POST /api/modes/zen`
+- `GET /api/demo-click` and `POST /api/demo-click` remain as compatibility aliases for the longing counter
+
+The data layer keeps a single `DemoCounter` table and uses different `id` values to represent the different mode counters.

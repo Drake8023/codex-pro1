@@ -5,6 +5,18 @@ from flask import Flask
 
 from app.api import api_bp
 from app.extensions import db
+from app.models import DemoCounter
+
+LONGING_COUNTER_ID = 1
+ZEN_COUNTER_ID = 2
+
+
+def _ensure_counter(counter_id: int, default_count: int = 0) -> DemoCounter:
+    counter = db.session.get(DemoCounter, counter_id)
+    if counter is None:
+        counter = DemoCounter(id=counter_id, count=default_count)
+        db.session.add(counter)
+    return counter
 
 
 def create_app() -> Flask:
@@ -24,11 +36,9 @@ def create_app() -> Flask:
     app.register_blueprint(api_bp, url_prefix="/api")
 
     with app.app_context():
-        from app.models import DemoCounter
-
         db.create_all()
-        if db.session.get(DemoCounter, 1) is None:
-            db.session.add(DemoCounter(id=1, count=0))
-            db.session.commit()
+        _ensure_counter(LONGING_COUNTER_ID, 0)
+        _ensure_counter(ZEN_COUNTER_ID, 0)
+        db.session.commit()
 
     return app
