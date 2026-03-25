@@ -45,12 +45,3 @@ Public traffic goes through `http://<server-ip>:5173` on the frontend container,
 ## Database
 
 Default PostgreSQL settings used by Docker Compose:
-
-- Host inside Compose: `db`
-- Host on server: `127.0.0.1`
-- Port: `5432`
-- Database: `codex_pro1`
-- Username: `codex`
-- Password: `80238023`
-
-The backend reads `DATABASE_URL`. If it is not set, the app falls back to a local SQLite file for convenience.
