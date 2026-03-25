@@ -5,46 +5,44 @@ type HealthState = {
   message: string;
 };
 
-type ClickState = {
-  status: "idle" | "loading" | "success" | "error";
-  count: number;
-  message: string;
+type ModeCounts = {
+  longingCount: number;
+  zenHits: number;
 };
 
-const focusItems = [
-  {
-    title: "Frontend",
-    value: "React + Vite",
-    detail: "A fast TypeScript client ready for routes, forms, and shared components.",
-  },
-  {
-    title: "Backend",
-    value: "Flask API",
-    detail: "A small Flask service with a clean app factory and a simple health endpoint.",
-  },
-  {
-    title: "Integration",
-    value: "Shared repo",
-    detail: "Frontend and backend can run together locally now and move into Docker together later.",
-  },
-];
+type RequestState = "idle" | "loading" | "success" | "error";
+type ModeName = "longing" | "zen";
 
-const nextSteps = [
-  "Add real business routes and shared layout components.",
-  "Replace the in-memory demo endpoint with real feature APIs when the first workflow is ready.",
-  "Harden the Docker setup for production deployment and CI.",
+type Burst = {
+  id: number;
+  label: string;
+  x: string;
+  y: string;
+};
+
+const modeCards = [
+  {
+    mode: "longing" as const,
+    name: "Longing Mode",
+    description: "Track how many times the feeling comes back.",
+  },
+  {
+    mode: "zen" as const,
+    name: "Zen Mode",
+    description: "Tap the mokugyo and let the pain slip away.",
+  },
 ];
 
 export default function App() {
+  const [currentMode, setCurrentMode] = useState<ModeName>("longing");
   const [health, setHealth] = useState<HealthState>({
     status: "loading",
-    message: "Checking backend connection...",
+    message: "Connecting to the backend...",
   });
-  const [clickState, setClickState] = useState<ClickState>({
-    status: "loading",
-    count: 0,
-    message: "Loading demo click counter...",
-  });
+  const [counts, setCounts] = useState<ModeCounts>({ longingCount: 0, zenHits: 0 });
+  const [longingState, setLongingState] = useState<RequestState>("loading");
+  const [zenState, setZenState] = useState<RequestState>("loading");
+  const [bursts, setBursts] = useState<Burst[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -63,7 +61,7 @@ export default function App() {
 
         setHealth({
           status: "success",
-          message: `Backend responded with status: ${data.status ?? "unknown"}`,
+          message: `Backend status: ${data.status ?? "unknown"}`,
         });
       } catch (error) {
         if (!active) {
@@ -78,155 +76,186 @@ export default function App() {
       }
     };
 
-    const loadClickState = async () => {
+    const loadCounts = async () => {
       try {
-        const response = await fetch("/api/demo-click");
+        const response = await fetch("/api/modes/state");
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const data: { count?: number; message?: string } = await response.json();
+        const data: Partial<ModeCounts> = await response.json();
         if (!active) {
           return;
         }
 
-        setClickState({
-          status: "success",
-          count: data.count ?? 0,
-          message: data.message ?? "Ready for click test",
+        setCounts({
+          longingCount: data.longingCount ?? 0,
+          zenHits: data.zenHits ?? 0,
         });
-      } catch (error) {
+        setLongingState("success");
+        setZenState("success");
+      } catch {
         if (!active) {
           return;
         }
 
-        const message = error instanceof Error ? error.message : "Unknown error";
-        setClickState({
-          status: "error",
-          count: 0,
-          message: `Counter request failed: ${message}`,
-        });
+        setLongingState("error");
+        setZenState("error");
       }
     };
 
     void loadHealth();
-    void loadClickState();
+    void loadCounts();
 
     return () => {
       active = false;
     };
   }, []);
 
-  const handleClickTest = async () => {
-    setClickState((current) => ({
-      ...current,
-      status: "loading",
-      message: "Sending click to backend...",
-    }));
+  const addBurst = (label: string) => {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    const x = `${12 + Math.random() * 72}%`;
+    const y = `${18 + Math.random() * 42}%`;
+    setBursts((current) => [...current, { id, label, x, y }]);
+    window.setTimeout(() => {
+      setBursts((current) => current.filter((item) => item.id !== id));
+    }, 1100);
+  };
 
+  const handleLongingTap = async () => {
+    setLongingState("loading");
     try {
-      const response = await fetch("/api/demo-click", { method: "POST" });
+      const response = await fetch("/api/modes/longing", { method: "POST" });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      const data: { count?: number; message?: string } = await response.json();
-      setClickState({
-        status: "success",
-        count: data.count ?? 0,
-        message: data.message ?? "Click recorded",
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      setClickState((current) => ({
+      const data: { longingCount?: number } = await response.json();
+      setCounts((current) => ({
         ...current,
-        status: "error",
-        message: `Click request failed: ${message}`,
+        longingCount: data.longingCount ?? current.longingCount,
       }));
+      setLongingState("success");
+      addBurst("Recorded");
+    } catch {
+      setLongingState("error");
+    }
+  };
+
+  const handleZenTap = async () => {
+    setZenState("loading");
+    try {
+      const response = await fetch("/api/modes/zen", { method: "POST" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: { zenHits?: number } = await response.json();
+      setCounts((current) => ({
+        ...current,
+        zenHits: data.zenHits ?? current.zenHits,
+      }));
+      setZenState("success");
+      addBurst("Pain -1");
+    } catch {
+      setZenState("error");
     }
   };
 
   return (
-    <main className="app-shell">
-      <section className="workspace">
-        <div className="workspace__header">
-          <p className="eyebrow">codex-pro1 / integrated starter</p>
-          <h1>One repo, one frontend, one backend.</h1>
+    <main className={`app-shell app-shell--${currentMode}`}>
+      <div className="backdrop backdrop--a" aria-hidden="true" />
+      <div className="backdrop backdrop--b" aria-hidden="true" />
+      <div className="backdrop backdrop--c" aria-hidden="true" />
+
+      <section className="page">
+        <header className="masthead">
+          <p className="eyebrow">codex-pro1 / ritual interface</p>
+          <h1>Two modes, one quiet little habit.</h1>
           <p className="lede">
-            This workspace now has a React frontend and a Flask backend wired together around a
-            simple API contract. It is intentionally lean, but it is ready for feature work,
-            local development, and the first round of Docker-based setup.
+            Open in Longing Mode by default, or flip to Zen Mode and tap the mokugyo in the center.
           </p>
-        </div>
-
-        <div className="workspace__grid">
-          <section className="panel panel--hero">
-            <div className="panel__topline">
-              <span className="status-dot" aria-hidden="true" />
-              Integration baseline is in place
-            </div>
-            <h2>Frontend to backend check</h2>
-            <p>{health.message}</p>
-            <div className="health-chip health-chip--status" data-state={health.status}>
-              <span className="health-chip__label">API status</span>
-              <strong>{health.status}</strong>
-            </div>
-            <div className="panel__actions">
-              <a className="button button--primary" href="#click-test">
-                Test interaction
-              </a>
-              <a className="button button--ghost" href="#focus">
-                Inspect integration
-              </a>
-            </div>
-          </section>
-
-          <section className="panel" id="focus">
-            <h2>Current foundation</h2>
-            <div className="focus-list">
-              {focusItems.map((item) => (
-                <article className="focus-item" key={item.title}>
-                  <p>{item.title}</p>
-                  <strong>{item.value}</strong>
-                  <span>{item.detail}</span>
-                </article>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <section className="panel panel--wide" id="click-test">
-          <h2>Clickable integration test</h2>
-          <p>
-            Use this button to confirm the React app can send a write request to Flask and render
-            the latest response back in the UI.
-          </p>
-          <div className="demo-card">
-            <div className="demo-card__metric">
-              <span>Total clicks recorded</span>
-              <strong>{clickState.count}</strong>
-            </div>
-            <div className="health-chip health-chip--status" data-state={clickState.status}>
-              <span className="health-chip__label">Demo request</span>
-              <strong>{clickState.status}</strong>
-            </div>
-            <p>{clickState.message}</p>
-            <button className="button button--primary" type="button" onClick={handleClickTest}>
-              Click and call backend
-            </button>
+          <div className="health-pill" data-state={health.status}>
+            <span className="health-pill__dot" />
+            <span>{health.message}</span>
           </div>
-        </section>
+        </header>
 
-        <section className="panel panel--wide" id="next-steps">
-          <h2>Suggested next pass</h2>
-          <ol className="step-list">
-            {nextSteps.map((step, index) => (
-              <li key={step}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <p>{step}</p>
-              </li>
-            ))}
-          </ol>
+        <nav className="mode-switcher" aria-label="Mode switcher">
+          {modeCards.map((item) => (
+            <button
+              key={item.mode}
+              type="button"
+              className={`mode-chip ${currentMode === item.mode ? "is-active" : ""}`}
+              onClick={() => setCurrentMode(item.mode)}
+            >
+              <strong>{item.name}</strong>
+              <span>{item.description}</span>
+            </button>
+          ))}
+        </nav>
+
+        <section className={`stage stage--${currentMode}`}>
+          {currentMode === "longing" ? (
+            <div className="mode-view mode-view--longing">
+              <div className="mode-copy">
+                <p className="mode-tag">Main Mode</p>
+                <h2>Longing Mode</h2>
+                <p>
+                  Count every return of the feeling. The number stays with you and the record stays
+                  with the app.
+                </p>
+              </div>
+
+              <div className="count-panel count-panel--longing">
+                <span>Longing Count</span>
+                <strong>{counts.longingCount}</strong>
+                <small data-state={longingState}>
+                  {longingState === "error" ? "Sync failed" : "Stored in the database"}
+                </small>
+              </div>
+
+              <button
+                type="button"
+                className="action-button action-button--longing"
+                onClick={handleLongingTap}
+              >
+                <span className="action-button__spark" />
+                <span>Count One More Thought</span>
+              </button>
+            </div>
+          ) : (
+            <div className="mode-view mode-view--zen">
+              <div className="mode-copy mode-copy--zen">
+                <p className="mode-tag">Meditation Mode</p>
+                <h2>Strike the Mokugyo</h2>
+                <p>Tap the drum in the middle. Each hit lets the pain fall by one.</p>
+              </div>
+
+              <div className="zen-stage">
+                <button type="button" className="mokugyo" onClick={handleZenTap} aria-label="Tap mokugyo">
+                  <span className="mokugyo__ring" aria-hidden="true" />
+                  <span className="mokugyo__drum" aria-hidden="true" />
+                  <span className="mokugyo__mallet" aria-hidden="true" />
+                  <span className="mokugyo__glow" aria-hidden="true" />
+                </button>
+
+                <div className="zen-readout">
+                  <span>Pain Reduced</span>
+                  <strong>{counts.zenHits}</strong>
+                  <small data-state={zenState}>{zenState === "error" ? "Try again" : "Each strike is saved"}</small>
+                </div>
+
+                <div className="burst-layer" aria-hidden="true">
+                  {bursts.map((item) => (
+                    <span key={item.id} className="burst" style={{ left: item.x, top: item.y }}>
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       </section>
     </main>
