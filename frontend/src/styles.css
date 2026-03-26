@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
   background: #050816;
   color: #f4f7ff;
   line-height: 1.5;
@@ -99,7 +99,7 @@ img {
   top: 1rem;
   z-index: 10;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 1rem;
   align-items: center;
   max-width: 1200px;
@@ -132,11 +132,17 @@ img {
 
 .top-links {
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .top-actions {
   justify-content: flex-end;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.top-nav > * {
+  min-width: 0;
 }
 
 .top-link,
@@ -305,8 +311,9 @@ img {
 .empty-state h2 {
   margin: 0;
   font-size: clamp(2rem, 4vw, 4.4rem);
-  line-height: 0.95;
-  max-width: 10ch;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  max-width: 11ch;
 }
 
 .feed-hero__meta,
@@ -330,6 +337,11 @@ img {
   display: flex;
   align-items: center;
   gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.post-row__author {
+  min-width: 0;
 }
 
 .post-row__meta p,
@@ -349,6 +361,7 @@ label span,
   font-size: 1.06rem;
   line-height: 1.8;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .post-row__images {
@@ -434,6 +447,7 @@ textarea {
   display: flex;
   gap: 1rem;
   align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .compose-shell {
@@ -630,10 +644,60 @@ textarea {
   justify-items: start;
 }
 
+.status-copy {
+  line-height: 1.65;
+}
+
+.status-copy--section {
+  margin-top: 1rem;
+}
+
+.language-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(7, 13, 28, 0.68);
+}
+
+.language-switch__item {
+  padding: 0.55rem 0.85rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  border-radius: 999px;
+}
+
+.language-switch__item.is-active {
+  background: rgba(139, 161, 255, 0.18);
+  color: #f4f7ff;
+}
+
+.session-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.session-pill__name {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-hero__meta p,
+.form-shell .status-copy,
+.create-head .status-copy {
+  max-width: 32rem;
+}
+
 @media (max-width: 900px) {
   .top-nav {
     grid-template-columns: 1fr;
-    justify-items: start;
+    justify-items: stretch;
   }
 
   .top-links,
@@ -682,6 +746,14 @@ textarea {
   .feed-hero__meta {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .language-switch {
+    align-self: flex-start;
+  }
+
+  .session-pill__name {
+    max-width: none;
   }
 
   .floating-menu {
