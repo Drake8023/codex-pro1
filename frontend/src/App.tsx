@@ -30,7 +30,8 @@ function getInitials(name: string) {
 function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [ritualMenuOpen, setRitualMenuOpen] = useState(false);
   const [language, setLanguage] = useState<Language>(() => getInitialLanguage());
   const [health, setHealth] = useState<HealthState>({ status: "loading", message: "API" });
   const [counts, setCounts] = useState<ModeCounts>({ longingCount: 0, zenHits: 0 });
@@ -50,11 +51,11 @@ function AppShell() {
   }, [language]);
 
   useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [menuOpen]);
+  }, [mobileMenuOpen]);
 
   async function refreshHealth() {
     try {
@@ -85,7 +86,7 @@ function AppShell() {
 
   useEffect(() => { void refreshHealth(); void refreshSession(); void refreshCounts(); void refreshPosts(); }, []);
   useEffect(() => { void refreshHealth(); }, [language]);
-  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+  useEffect(() => { setMobileMenuOpen(false); setRitualMenuOpen(false); }, [location.pathname]);
 
   const addBurst = (label: string) => {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -104,11 +105,11 @@ function AppShell() {
   };
   const handleRegister = async (payload: RegisterPayload) => { setCurrentUser((await apiRequest<{ user: User }>("/api/auth/register", { method: "POST", body: JSON.stringify(payload) })).user); await refreshPosts(); };
   const handleLogin = async (payload: AuthPayload) => { setCurrentUser((await apiRequest<{ user: User }>("/api/auth/login", { method: "POST", body: JSON.stringify(payload) })).user); await refreshPosts(); };
-  const handleLogout = async () => { await apiRequest<{ message: string }>("/api/auth/logout", { method: "POST" }); setCurrentUser(null); setMenuOpen(false); navigate("/"); };
+  const handleLogout = async () => { await apiRequest<{ message: string }>("/api/auth/logout", { method: "POST" }); setCurrentUser(null); setMobileMenuOpen(false); setRitualMenuOpen(false); navigate("/"); };
   const handleUploadImages = async (files: FileList | File[]) => { const formData = new FormData(); Array.from(files).forEach((file) => formData.append("images", file)); return (await apiRequest<{ images: UploadedImage[] }>("/api/uploads/images", { method: "POST", body: formData })).images; };
   const handleCreatePost = async (content: string, imageUrls: string[]) => { const data = await apiRequest<{ post: PostItem }>("/api/posts", { method: "POST", body: JSON.stringify({ content, imageUrls }) }); setPosts((current) => [data.post, ...current]); navigate("/"); };
   const ownPosts = currentUser ? posts.filter((post) => post.author.id === currentUser.id) : [];
-  const closeDrawer = () => setMenuOpen(false);
+  const closeDrawer = () => setMobileMenuOpen(false);
 
   return (
     <main className={`app-shell language-${language}`} data-build={runtimeBuildTag}>
@@ -144,14 +145,14 @@ function AppShell() {
           )}
         </div>
 
-        <button className={`mobile-nav-toggle ${menuOpen ? "is-open" : ""}`} type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((current) => !current)}>
+        <button className={`mobile-nav-toggle ${mobileMenuOpen ? "is-open" : ""}`} type="button" aria-label={mobileMenuOpen ? "Close menu" : "Open menu"} aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((current) => !current)}>
           <span />
           <span />
           <span />
         </button>
       </header>
 
-      <div className={`mobile-drawer-shell ${menuOpen ? "is-open" : ""}`} aria-hidden={!menuOpen}>
+      <div className={`mobile-drawer-shell ${mobileMenuOpen ? "is-open" : ""}`} aria-hidden={!mobileMenuOpen}>
         <button className="mobile-drawer-shell__backdrop" type="button" aria-label="Close menu" onClick={closeDrawer} />
         <aside className="mobile-drawer">
           <div className="mobile-drawer__head">
@@ -206,8 +207,8 @@ function AppShell() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      <div className={`floating-menu ${menuOpen ? "is-open" : ""}`}>
-        <button className="floating-menu__trigger" type="button" onClick={() => setMenuOpen((current) => !current)}><span>{menuOpen ? t.close : t.rituals}</span></button>
+      <div className={`floating-menu ${ritualMenuOpen ? "is-open" : ""}`}>
+        <button className="floating-menu__trigger" type="button" onClick={() => setRitualMenuOpen((current) => !current)}><span>{ritualMenuOpen ? t.close : t.rituals}</span></button>
         <div className="floating-menu__panel">
           <button className="floating-menu__item" type="button" onClick={() => navigate("/ritual/longing")}><strong>{t.longing}</strong><span>{counts.longingCount}</span></button>
           <button className="floating-menu__item" type="button" onClick={() => navigate("/ritual/zen")}><strong>{t.zen}</strong><span>{counts.zenHits}</span></button>
