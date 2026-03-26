@@ -92,7 +92,7 @@ function AppShell() {
   };
   const handleZenTap = async () => {
     setZenState("loading");
-    try { const data = await apiRequest<{ zenHits?: number }>("/api/modes/zen", { method: "POST" }); setCounts((c) => ({ ...c, zenHits: data.zenHits ?? c.zenHits })); setZenState("success"); addBurst(language === "zh" ? "Ã€Õ¥ -1" : "Pain -1"); } catch { setZenState("error"); }
+    try { const data = await apiRequest<{ zenHits?: number }>("/api/modes/zen", { method: "POST" }); setCounts((c) => ({ ...c, zenHits: data.zenHits ?? c.zenHits })); setZenState("success"); addBurst(t.painMinusOne); } catch { setZenState("error"); }
   };
   const handleRegister = async (payload: RegisterPayload) => { setCurrentUser((await apiRequest<{ user: User }>("/api/auth/register", { method: "POST", body: JSON.stringify(payload) })).user); await refreshPosts(); };
   const handleLogin = async (payload: AuthPayload) => { setCurrentUser((await apiRequest<{ user: User }>("/api/auth/login", { method: "POST", body: JSON.stringify(payload) })).user); await refreshPosts(); };
@@ -117,7 +117,7 @@ function AppShell() {
           <div className="api-chip" data-state={health.status}><span className="api-chip__dot" /><span>{health.message}</span></div>
           <div className="language-switch" role="group" aria-label={t.language}>
             <button className={`language-switch__item ${language === "en" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("en")}>EN</button>
-            <button className={`language-switch__item ${language === "zh" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("zh")}>÷–Œƒ</button>
+            <button className={`language-switch__item ${language === "zh" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("zh")}>{t.languageZhLabel}</button>
           </div>
           {currentUser ? <div className="session-cluster"><Link className="session-pill" to="/profile"><span className="avatar-orb">{getInitials(currentUser.displayName)}</span><span className="session-pill__name">{currentUser.displayName}</span></Link><button className="ghost-button" type="button" onClick={() => void handleLogout()}>{t.logout}</button></div> : <div className="session-cluster"><Link className="ghost-link" to="/login">{t.login}</Link><Link className="solid-link" to="/register">{t.join}</Link></div>}
         </div>

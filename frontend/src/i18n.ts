@@ -9,6 +9,7 @@ export type Dictionary = {
   join: string;
   refresh: string;
   language: string;
+  languageZhLabel: string;
   feedEyebrow: string;
   feedTitle: string;
   signedInAs: (name: string) => string;
@@ -66,6 +67,7 @@ export type Dictionary = {
   zenTitle: string;
   longingCount: string;
   painReduced: string;
+  painMinusOne: string;
   count: string;
   strikeMokugyo: string;
   tryAgain: string;
@@ -87,6 +89,7 @@ export const dictionaries: Record<Language, Dictionary> = {
     join: "Join",
     refresh: "Refresh",
     language: "Language",
+    languageZhLabel: "ZH",
     feedEyebrow: "Private archive",
     feedTitle: "Feed the gallery with text, images, and small rituals.",
     signedInAs: (name) => `Signed in as ${name}`,
@@ -144,6 +147,7 @@ export const dictionaries: Record<Language, Dictionary> = {
     zenTitle: "Strike the mokugyo.",
     longingCount: "Longing Count",
     painReduced: "Pain Reduced",
+    painMinusOne: "Pain -1",
     count: "Count",
     strikeMokugyo: "Strike mokugyo",
     tryAgain: "Try again",
@@ -163,6 +167,7 @@ export const dictionaries: Record<Language, Dictionary> = {
     join: "??",
     refresh: "??",
     language: "??",
+    languageZhLabel: "??",
     feedEyebrow: "????",
     feedTitle: "??????????????????",
     signedInAs: (name) => `?????${name}`,
@@ -220,6 +225,7 @@ export const dictionaries: Record<Language, Dictionary> = {
     zenTitle: "??????",
     longingCount: "????",
     painReduced: "????",
+    painMinusOne: "?? -1",
     count: "??",
     strikeMokugyo: "???",
     tryAgain: "???",
