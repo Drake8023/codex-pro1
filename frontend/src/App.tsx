@@ -9,7 +9,18 @@ type ModeName = "longing" | "zen";
 type Burst = { id: number; label: string; x: string; y: string };
 type User = { id: number; email: string; displayName: string; avatarUrl: string | null; bio: string | null; createdAt: string; updatedAt: string };
 type PostImage = { id: number; url: string; sortOrder: number };
-type PostItem = { id: number; content: string; createdAt: string; updatedAt: string; author: User; images: PostImage[] };
+type PostComment = { id: number; content: string; createdAt: string; updatedAt: string; author: User };
+type PostItem = {
+  id: number;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  author: User;
+  images: PostImage[];
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+};
 type UploadedImage = { name: string; url: string };
 type AuthPayload = { email: string; password: string };
 type RegisterPayload = AuthPayload & { displayName: string };
@@ -108,6 +119,20 @@ function AppShell() {
   const handleLogout = async () => { await apiRequest<{ message: string }>("/api/auth/logout", { method: "POST" }); setCurrentUser(null); setMobileMenuOpen(false); setRitualMenuOpen(false); navigate("/"); };
   const handleUploadImages = async (files: FileList | File[]) => { const formData = new FormData(); Array.from(files).forEach((file) => formData.append("images", file)); return (await apiRequest<{ images: UploadedImage[] }>("/api/uploads/images", { method: "POST", body: formData })).images; };
   const handleCreatePost = async (content: string, imageUrls: string[]) => { const data = await apiRequest<{ post: PostItem }>("/api/posts", { method: "POST", body: JSON.stringify({ content, imageUrls }) }); setPosts((current) => [data.post, ...current]); navigate("/"); };
+  const handleToggleLike = async (postId: number) => {
+    const data = await apiRequest<{ likeCount: number; likedByMe: boolean }>(`/api/posts/${postId}/likes/toggle`, { method: "POST" });
+    setPosts((current) => current.map((post) => (post.id === postId ? { ...post, likeCount: data.likeCount, likedByMe: data.likedByMe } : post)));
+    return data;
+  };
+  const handleLoadComments = async (postId: number) => (await apiRequest<{ comments: PostComment[] }>(`/api/posts/${postId}/comments`)).comments;
+  const handleCreateComment = async (postId: number, content: string) => {
+    const data = await apiRequest<{ comment: PostComment; commentCount: number }>(`/api/posts/${postId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+    setPosts((current) => current.map((post) => (post.id === postId ? { ...post, commentCount: data.commentCount } : post)));
+    return data;
+  };
   const ownPosts = currentUser ? posts.filter((post) => post.author.id === currentUser.id) : [];
   const closeDrawer = () => setMobileMenuOpen(false);
 
@@ -197,7 +222,7 @@ function AppShell() {
       </div>
 
       <Routes>
-        <Route path="/" element={<FeedPage currentUser={currentUser} posts={posts} state={feedState} language={language} t={t} onRefresh={() => void refreshPosts()} />} />
+        <Route path="/" element={<FeedPage currentUser={currentUser} posts={posts} state={feedState} language={language} t={t} onRefresh={() => void refreshPosts()} onToggleLike={handleToggleLike} onLoadComments={handleLoadComments} onCreateComment={handleCreateComment} />} />
         <Route path="/login" element={<LoginPage currentUser={currentUser} onLogin={handleLogin} t={t} />} />
         <Route path="/register" element={<RegisterPage currentUser={currentUser} onRegister={handleRegister} t={t} />} />
         <Route path="/create" element={<CreatePage currentUser={currentUser} onUpload={handleUploadImages} onPublish={handleCreatePost} t={t} />} />
@@ -220,9 +245,85 @@ function AppShell() {
   );
 }
 
-type FeedPageProps = { currentUser: User | null; posts: PostItem[]; state: RequestState; language: Language; t: Dictionary; onRefresh: () => void };
-function FeedPage({ currentUser, posts, state, language, t, onRefresh }: FeedPageProps) {
-  return <section className="feed-page"><div className="feed-hero"><div><p className="eyebrow">{t.feedEyebrow}</p><h1>{t.feedTitle}</h1></div><div className="feed-hero__meta"><p>{currentUser ? t.signedInAs(currentUser.displayName) : t.joinPrompt}</p><button className="ghost-button" type="button" onClick={onRefresh}>{t.refresh}</button></div></div>{state === "loading" ? <p className="status-copy status-copy--section">{t.loadingPosts}</p> : null}{state === "error" ? <p className="status-copy status-copy--section">{t.feedUnavailable}</p> : null}{state === "success" && posts.length === 0 ? <div className="empty-state"><p className="eyebrow">{t.noPostsEyebrow}</p><h2>{t.noPostsTitle}</h2><p>{t.noPostsBody}</p></div> : null}<div className="feed-list">{posts.map((post) => <article className="post-row" key={post.id}><div className="post-row__meta">{post.author.avatarUrl ? <img className="avatar-orb avatar-orb--image" src={post.author.avatarUrl} alt={post.author.displayName} /> : <span className="avatar-orb">{getInitials(post.author.displayName)}</span>}<div className="post-row__author"><strong>{post.author.displayName}</strong><p>{formatTimestamp(post.createdAt, language)}</p></div></div>{post.content ? <p className="post-row__content">{post.content}</p> : null}{post.images.length > 0 ? <div className={`post-row__images post-row__images--${post.images.length > 1 ? "grid" : "single"}`}>{post.images.map((image) => <img key={image.id} src={image.url} alt={t.postMediaAlt} loading="lazy" />)}</div> : null}</article>)}</div></section>;
+type FeedPageProps = {
+  currentUser: User | null;
+  posts: PostItem[];
+  state: RequestState;
+  language: Language;
+  t: Dictionary;
+  onRefresh: () => void;
+  onToggleLike: (postId: number) => Promise<{ likeCount: number; likedByMe: boolean }>;
+  onLoadComments: (postId: number) => Promise<PostComment[]>;
+  onCreateComment: (postId: number, content: string) => Promise<{ comment: PostComment; commentCount: number }>;
+};
+function FeedPage({ currentUser, posts, state, language, t, onRefresh, onToggleLike, onLoadComments, onCreateComment }: FeedPageProps) {
+  return <section className="feed-page"><div className="feed-hero"><div><p className="eyebrow">{t.feedEyebrow}</p><h1>{t.feedTitle}</h1></div><div className="feed-hero__meta"><p>{currentUser ? t.signedInAs(currentUser.displayName) : t.joinPrompt}</p><button className="ghost-button" type="button" onClick={onRefresh}>{t.refresh}</button></div></div>{state === "loading" ? <p className="status-copy status-copy--section">{t.loadingPosts}</p> : null}{state === "error" ? <p className="status-copy status-copy--section">{t.feedUnavailable}</p> : null}{state === "success" && posts.length === 0 ? <div className="empty-state"><p className="eyebrow">{t.noPostsEyebrow}</p><h2>{t.noPostsTitle}</h2><p>{t.noPostsBody}</p></div> : null}<div className="feed-list">{posts.map((post) => <FeedPostCard key={post.id} currentUser={currentUser} post={post} language={language} t={t} onToggleLike={onToggleLike} onLoadComments={onLoadComments} onCreateComment={onCreateComment} />)}</div></section>;
+}
+
+type FeedPostCardProps = {
+  currentUser: User | null;
+  post: PostItem;
+  language: Language;
+  t: Dictionary;
+  onToggleLike: (postId: number) => Promise<{ likeCount: number; likedByMe: boolean }>;
+  onLoadComments: (postId: number) => Promise<PostComment[]>;
+  onCreateComment: (postId: number, content: string) => Promise<{ comment: PostComment; commentCount: number }>;
+};
+function FeedPostCard({ currentUser, post, language, t, onToggleLike, onLoadComments, onCreateComment }: FeedPostCardProps) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [commentsState, setCommentsState] = useState<RequestState>("idle");
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentSubmitState, setCommentSubmitState] = useState<RequestState>("idle");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [likeState, setLikeState] = useState<RequestState>("idle");
+
+  const toggleComments = async () => {
+    const nextOpen = !commentsOpen;
+    setCommentsOpen(nextOpen);
+    if (!nextOpen || commentsState === "loading" || commentsState === "success") return;
+    setCommentsState("loading");
+    setStatusMessage("");
+    try {
+      setComments(await onLoadComments(post.id));
+      setCommentsState("success");
+    } catch (error) {
+      setCommentsState("error");
+      setStatusMessage(error instanceof Error ? error.message : t.commentsLoadFailed);
+    }
+  };
+
+  const handleLike = async () => {
+    setLikeState("loading");
+    setStatusMessage("");
+    try {
+      await onToggleLike(post.id);
+      setLikeState("success");
+    } catch (error) {
+      setLikeState("error");
+      setStatusMessage(error instanceof Error ? error.message : t.likeFailed);
+    }
+  };
+
+  const handleCommentSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!commentDraft.trim()) return;
+    setCommentSubmitState("loading");
+    setStatusMessage("");
+    try {
+      const data = await onCreateComment(post.id, commentDraft.trim());
+      setComments((current) => [...current, data.comment]);
+      setCommentsOpen(true);
+      setCommentsState("success");
+      setCommentDraft("");
+      setCommentSubmitState("success");
+    } catch (error) {
+      setCommentSubmitState("error");
+      setStatusMessage(error instanceof Error ? error.message : t.commentFailed);
+    }
+  };
+
+  return <article className="post-row"><div className="post-row__meta">{post.author.avatarUrl ? <img className="avatar-orb avatar-orb--image" src={post.author.avatarUrl} alt={post.author.displayName} /> : <span className="avatar-orb">{getInitials(post.author.displayName)}</span>}<div className="post-row__author"><strong>{post.author.displayName}</strong><p>{formatTimestamp(post.createdAt, language)}</p></div></div>{post.content ? <p className="post-row__content">{post.content}</p> : null}{post.images.length > 0 ? <div className={`post-row__images post-row__images--${post.images.length > 1 ? "grid" : "single"}`}>{post.images.map((image) => <img key={image.id} src={image.url} alt={t.postMediaAlt} loading="lazy" />)}</div> : null}<div className="post-row__actions"><button className={`post-action ${post.likedByMe ? "is-active" : ""}`} type="button" onClick={() => void handleLike()} disabled={!currentUser || likeState === "loading"} title={currentUser ? t.like : t.authRequiredAction}><span>{post.likedByMe ? t.liked : t.like}</span><strong>{post.likeCount}</strong></button><button className={`post-action ${commentsOpen ? "is-active" : ""}`} type="button" onClick={() => void toggleComments()}><span>{t.comments}</span><strong>{post.commentCount}</strong></button></div>{statusMessage ? <p className="status-copy post-row__status">{statusMessage}</p> : null}{commentsOpen ? <div className="comments-panel">{commentsState === "loading" ? <p className="status-copy">{t.loadingComments}</p> : null}{commentsState === "success" && comments.length === 0 ? <p className="status-copy">{t.noComments}</p> : null}{comments.length > 0 ? <div className="comments-list">{comments.map((comment) => <article className="comment-row" key={comment.id}><div className="comment-row__meta"><strong>{comment.author.displayName}</strong><span>{formatTimestamp(comment.createdAt, language)}</span></div><p>{comment.content}</p></article>)}</div> : null}<form className="comment-form" onSubmit={handleCommentSubmit}><label className="compose-shell__field"><span>{t.addComment}</span><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} rows={3} placeholder={currentUser ? t.commentPlaceholder : t.signInToComment} disabled={!currentUser || commentSubmitState === "loading"} /></label><button className="solid-link solid-link--button" type="submit" disabled={!currentUser || commentSubmitState === "loading" || !commentDraft.trim()}>{commentSubmitState === "loading" ? t.sendingComment : t.publishComment}</button></form></div> : null}</article>;
 }
 
 type LoginPageProps = { currentUser: User | null; onLogin: (payload: AuthPayload) => Promise<void>; t: Dictionary };
@@ -303,3 +404,7 @@ function RitualPage({ mode, count, state, bursts, onTap, onSwitch, t }: RitualPa
 export default function App() {
   return <AppShell />;
 }
+
+
+
+

@@ -27,6 +27,10 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
     posts = db.relationship("Post", back_populates="author", cascade="all, delete-orphan")
+    post_likes = db.relationship("PostLike", back_populates="user", cascade="all, delete-orphan")
+    post_comments = db.relationship("PostComment", back_populates="author", cascade="all, delete-orphan")
+    messages = db.relationship("Message", back_populates="sender", cascade="all, delete-orphan")
+    conversation_participants = db.relationship("ConversationParticipant", back_populates="user", cascade="all, delete-orphan")
 
 
 class Post(db.Model):
@@ -39,12 +43,9 @@ class Post(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
     author = db.relationship("User", back_populates="posts")
-    images = db.relationship(
-        "PostImage",
-        back_populates="post",
-        cascade="all, delete-orphan",
-        order_by="PostImage.sort_order",
-    )
+    images = db.relationship("PostImage", back_populates="post", cascade="all, delete-orphan", order_by="PostImage.sort_order")
+    likes = db.relationship("PostLike", back_populates="post", cascade="all, delete-orphan")
+    comments = db.relationship("PostComment", back_populates="post", cascade="all, delete-orphan", order_by="PostComment.created_at")
 
 
 class PostImage(db.Model):
@@ -56,3 +57,66 @@ class PostImage(db.Model):
     sort_order = db.Column(db.Integer, nullable=False, default=0)
 
     post = db.relationship("Post", back_populates="images")
+
+
+class PostLike(db.Model):
+    __tablename__ = "post_likes"
+    __table_args__ = (db.UniqueConstraint("post_id", "user_id", name="uq_post_like_post_user"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+    post = db.relationship("Post", back_populates="likes")
+    user = db.relationship("User", back_populates="post_likes")
+
+
+class PostComment(db.Model):
+    __tablename__ = "post_comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    post = db.relationship("Post", back_populates="comments")
+    author = db.relationship("User", back_populates="post_comments")
+
+
+class Conversation(db.Model):
+    __tablename__ = "conversations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow, index=True)
+
+    participants = db.relationship("ConversationParticipant", back_populates="conversation", cascade="all, delete-orphan")
+    messages = db.relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
+
+
+class ConversationParticipant(db.Model):
+    __tablename__ = "conversation_participants"
+    __table_args__ = (db.UniqueConstraint("conversation_id", "user_id", name="uq_conversation_participant"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey("conversations.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+
+    conversation = db.relationship("Conversation", back_populates="participants")
+    user = db.relationship("User", back_populates="conversation_participants")
+
+
+class Message(db.Model):
+    __tablename__ = "messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey("conversations.id"), nullable=False, index=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+
+    conversation = db.relationship("Conversation", back_populates="messages")
+    sender = db.relationship("User", back_populates="messages")

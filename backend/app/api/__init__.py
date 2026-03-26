@@ -10,7 +10,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import DemoCounter, Post, PostImage, User
+from app.models import Conversation, ConversationParticipant, DemoCounter, Message, Post, PostComment, PostImage, PostLike, User
 
 api_bp = Blueprint("api", __name__)
 
@@ -62,14 +62,24 @@ def _serialize_user(user: User) -> dict[str, object]:
 
 
 def _serialize_post_image(image: PostImage) -> dict[str, object]:
+    return {"id": image.id, "url": image.image_url, "sortOrder": image.sort_order}
+
+
+def _serialize_post_comment(comment: PostComment) -> dict[str, object]:
     return {
-        "id": image.id,
-        "url": image.image_url,
-        "sortOrder": image.sort_order,
+        "id": comment.id,
+        "content": comment.content,
+        "createdAt": comment.created_at.isoformat(),
+        "updatedAt": comment.updated_at.isoformat(),
+        "author": _serialize_user(comment.author),
     }
 
 
-def _serialize_post(post: Post) -> dict[str, object]:
+def _serialize_post(post: Post, current_user: User | None = None) -> dict[str, object]:
+    liked_by_me = False
+    if current_user is not None:
+        liked_by_me = any(like.user_id == current_user.id for like in post.likes)
+
     return {
         "id": post.id,
         "content": post.content,
@@ -77,6 +87,29 @@ def _serialize_post(post: Post) -> dict[str, object]:
         "updatedAt": post.updated_at.isoformat(),
         "author": _serialize_user(post.author),
         "images": [_serialize_post_image(image) for image in post.images],
+        "likeCount": len(post.likes),
+        "commentCount": len(post.comments),
+        "likedByMe": liked_by_me,
+    }
+
+
+def _serialize_message(message: Message) -> dict[str, object]:
+    return {
+        "id": message.id,
+        "content": message.content,
+        "createdAt": message.created_at.isoformat(),
+        "sender": _serialize_user(message.sender),
+    }
+
+
+def _serialize_conversation(conversation: Conversation, current_user: User) -> dict[str, object]:
+    other_participants = [participant.user for participant in conversation.participants if participant.user_id != current_user.id]
+    latest_message = conversation.messages[-1] if conversation.messages else None
+    return {
+        "id": conversation.id,
+        "participants": [_serialize_user(user) for user in other_participants],
+        "latestMessage": _serialize_message(latest_message) if latest_message else None,
+        "updatedAt": conversation.updated_at.isoformat(),
     }
 
 
@@ -95,6 +128,33 @@ def login_required(view):
         return view(user, *args, **kwargs)
 
     return wrapped
+
+
+def _get_post_or_404(post_id: int) -> Post | tuple[object, int]:
+    post = db.session.execute(
+        db.select(Post)
+        .options(selectinload(Post.author), selectinload(Post.images), selectinload(Post.likes), selectinload(Post.comments))
+        .where(Post.id == post_id)
+    ).scalar_one_or_none()
+    if post is None:
+        return _json_error("Post not found", 404)
+    return post
+
+
+def _get_conversation_for_user_or_404(conversation_id: int, current_user: User) -> Conversation | tuple[object, int]:
+    conversation = db.session.execute(
+        db.select(Conversation)
+        .options(
+            selectinload(Conversation.participants).selectinload(ConversationParticipant.user),
+            selectinload(Conversation.messages).selectinload(Message.sender),
+        )
+        .where(Conversation.id == conversation_id)
+    ).scalar_one_or_none()
+    if conversation is None:
+        return _json_error("Conversation not found", 404)
+    if not any(participant.user_id == current_user.id for participant in conversation.participants):
+        return _json_error("Conversation not found", 404)
+    return conversation
 
 
 @api_bp.get("/health")
@@ -119,7 +179,6 @@ def register_user():
 
     if not email or not password or not display_name:
         return _json_error("Display name, email, and password are required", 400)
-
     if len(password) < 6:
         return _json_error("Password must be at least 6 characters", 400)
 
@@ -127,17 +186,10 @@ def register_user():
     if existing_user is not None:
         return _json_error("Email is already registered", 409)
 
-    user = User(
-        email=email,
-        password_hash=generate_password_hash(password),
-        display_name=display_name,
-        avatar_url=avatar_url,
-        bio=bio,
-    )
+    user = User(email=email, password_hash=generate_password_hash(password), display_name=display_name, avatar_url=avatar_url, bio=bio)
     db.session.add(user)
     db.session.commit()
     _login_user(user)
-
     return jsonify(message="Registered", user=_serialize_user(user)), 201
 
 
@@ -163,24 +215,27 @@ def logout_user():
 
 @api_bp.get("/posts")
 def get_posts():
+    current_user = _get_current_user()
     posts = db.session.execute(
         db.select(Post)
-        .options(selectinload(Post.author), selectinload(Post.images))
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.images),
+            selectinload(Post.likes),
+            selectinload(Post.comments),
+        )
         .order_by(Post.created_at.desc())
     ).scalars().all()
-    return jsonify(posts=[_serialize_post(post) for post in posts])
+    return jsonify(posts=[_serialize_post(post, current_user) for post in posts])
 
 
 @api_bp.get("/posts/<int:post_id>")
 def get_post(post_id: int):
-    post = db.session.execute(
-        db.select(Post)
-        .options(selectinload(Post.author), selectinload(Post.images))
-        .where(Post.id == post_id)
-    ).scalar_one_or_none()
-    if post is None:
-        return _json_error("Post not found", 404)
-    return jsonify(post=_serialize_post(post))
+    current_user = _get_current_user()
+    post = _get_post_or_404(post_id)
+    if isinstance(post, tuple):
+        return post
+    return jsonify(post=_serialize_post(post, current_user))
 
 
 @api_bp.post("/posts")
@@ -204,10 +259,186 @@ def create_post(current_user: User):
 
     fresh_post = db.session.execute(
         db.select(Post)
-        .options(selectinload(Post.author), selectinload(Post.images))
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.images),
+            selectinload(Post.likes),
+            selectinload(Post.comments),
+        )
         .where(Post.id == post.id)
     ).scalar_one()
-    return jsonify(message="Post created", post=_serialize_post(fresh_post)), 201
+    return jsonify(message="Post created", post=_serialize_post(fresh_post, current_user)), 201
+
+
+@api_bp.post("/posts/<int:post_id>/likes/toggle")
+@login_required
+def toggle_post_like(current_user: User, post_id: int):
+    post = _get_post_or_404(post_id)
+    if isinstance(post, tuple):
+        return post
+
+    like = db.session.execute(
+        db.select(PostLike).where(PostLike.post_id == post.id, PostLike.user_id == current_user.id)
+    ).scalar_one_or_none()
+
+    liked = False
+    if like is None:
+        db.session.add(PostLike(post=post, user=current_user))
+        liked = True
+    else:
+        db.session.delete(like)
+
+    db.session.commit()
+
+    updated_post = _get_post_or_404(post.id)
+    if isinstance(updated_post, tuple):
+        return updated_post
+    return jsonify(likeCount=len(updated_post.likes), likedByMe=liked)
+
+
+@api_bp.get("/posts/<int:post_id>/comments")
+def get_post_comments(post_id: int):
+    post = _get_post_or_404(post_id)
+    if isinstance(post, tuple):
+        return post
+
+    comments = db.session.execute(
+        db.select(PostComment)
+        .options(selectinload(PostComment.author))
+        .where(PostComment.post_id == post.id)
+        .order_by(PostComment.created_at.asc())
+    ).scalars().all()
+    return jsonify(comments=[_serialize_post_comment(comment) for comment in comments])
+
+
+@api_bp.post("/posts/<int:post_id>/comments")
+@login_required
+def create_post_comment(current_user: User, post_id: int):
+    post = _get_post_or_404(post_id)
+    if isinstance(post, tuple):
+        return post
+
+    data = request.get_json(silent=True) or {}
+    content = str(data.get("content", "")).strip()
+    if not content:
+        return _json_error("Comment cannot be empty", 400)
+
+    comment = PostComment(post=post, author=current_user, content=content)
+    db.session.add(comment)
+    db.session.commit()
+
+    fresh_comment = db.session.execute(
+        db.select(PostComment).options(selectinload(PostComment.author)).where(PostComment.id == comment.id)
+    ).scalar_one()
+    comment_count = db.session.execute(db.select(db.func.count(PostComment.id)).where(PostComment.post_id == post.id)).scalar_one()
+    return jsonify(message="Comment created", comment=_serialize_post_comment(fresh_comment), commentCount=comment_count), 201
+
+
+@api_bp.post("/conversations")
+@login_required
+def create_or_get_conversation(current_user: User):
+    data = request.get_json(silent=True) or {}
+    target_user_id = data.get("targetUserId")
+    if not isinstance(target_user_id, int):
+        return _json_error("targetUserId is required", 400)
+    if target_user_id == current_user.id:
+        return _json_error("Cannot create a conversation with yourself", 400)
+
+    target_user = db.session.get(User, target_user_id)
+    if target_user is None:
+        return _json_error("User not found", 404)
+
+    current_conversation_ids = set(db.session.execute(db.select(ConversationParticipant.conversation_id).where(ConversationParticipant.user_id == current_user.id)).scalars().all())
+    target_conversation_ids = set(db.session.execute(db.select(ConversationParticipant.conversation_id).where(ConversationParticipant.user_id == target_user_id)).scalars().all())
+    shared_ids = current_conversation_ids.intersection(target_conversation_ids)
+
+    conversation = None
+    for conversation_id in shared_ids:
+        participant_count = db.session.execute(db.select(db.func.count(ConversationParticipant.id)).where(ConversationParticipant.conversation_id == conversation_id)).scalar_one()
+        if participant_count == 2:
+            conversation = db.session.execute(
+                db.select(Conversation)
+                .options(
+                    selectinload(Conversation.participants).selectinload(ConversationParticipant.user),
+                    selectinload(Conversation.messages).selectinload(Message.sender),
+                )
+                .where(Conversation.id == conversation_id)
+            ).scalar_one()
+            break
+
+    created = False
+    if conversation is None:
+        conversation = Conversation()
+        db.session.add(conversation)
+        db.session.flush()
+        db.session.add(ConversationParticipant(conversation=conversation, user=current_user))
+        db.session.add(ConversationParticipant(conversation=conversation, user=target_user))
+        db.session.commit()
+        created = True
+        conversation = db.session.execute(
+            db.select(Conversation)
+            .options(
+                selectinload(Conversation.participants).selectinload(ConversationParticipant.user),
+                selectinload(Conversation.messages).selectinload(Message.sender),
+            )
+            .where(Conversation.id == conversation.id)
+        ).scalar_one()
+
+    return jsonify(conversation=_serialize_conversation(conversation, current_user), created=created)
+
+
+@api_bp.get("/conversations")
+@login_required
+def get_conversations(current_user: User):
+    conversation_ids = db.session.execute(
+        db.select(ConversationParticipant.conversation_id).where(ConversationParticipant.user_id == current_user.id)
+    ).scalars().all()
+
+    if not conversation_ids:
+        return jsonify(conversations=[])
+
+    conversations = db.session.execute(
+        db.select(Conversation)
+        .options(
+            selectinload(Conversation.participants).selectinload(ConversationParticipant.user),
+            selectinload(Conversation.messages).selectinload(Message.sender),
+        )
+        .where(Conversation.id.in_(conversation_ids))
+        .order_by(Conversation.updated_at.desc())
+    ).scalars().all()
+    return jsonify(conversations=[_serialize_conversation(conversation, current_user) for conversation in conversations])
+
+
+@api_bp.get("/conversations/<int:conversation_id>/messages")
+@login_required
+def get_conversation_messages(current_user: User, conversation_id: int):
+    conversation = _get_conversation_for_user_or_404(conversation_id, current_user)
+    if isinstance(conversation, tuple):
+        return conversation
+    return jsonify(messages=[_serialize_message(message) for message in conversation.messages])
+
+
+@api_bp.post("/conversations/<int:conversation_id>/messages")
+@login_required
+def create_message(current_user: User, conversation_id: int):
+    conversation = _get_conversation_for_user_or_404(conversation_id, current_user)
+    if isinstance(conversation, tuple):
+        return conversation
+
+    data = request.get_json(silent=True) or {}
+    content = str(data.get("content", "")).strip()
+    if not content:
+        return _json_error("Message cannot be empty", 400)
+
+    message = Message(conversation=conversation, sender=current_user, content=content)
+    conversation.updated_at = message.created_at
+    db.session.add(message)
+    db.session.commit()
+
+    fresh_message = db.session.execute(
+        db.select(Message).options(selectinload(Message.sender)).where(Message.id == message.id)
+    ).scalar_one()
+    return jsonify(message=_serialize_message(fresh_message)), 201
 
 
 @api_bp.post("/uploads/images")
@@ -230,10 +461,7 @@ def upload_images(_current_user: User):
         stem = secure_filename(Path(original_name).stem) or "image"
         stored_name = f"{uuid4().hex}-{stem}.{extension}"
         file.save(upload_dir / stored_name)
-        saved_images.append({
-            "name": stored_name,
-            "url": f"/api/uploads/{stored_name}",
-        })
+        saved_images.append({"name": stored_name, "url": f"/api/uploads/{stored_name}"})
 
     return jsonify(message="Images uploaded", images=saved_images), 201
 
