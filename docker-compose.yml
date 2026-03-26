@@ -13,11 +13,15 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://codex:80238023@db:5432/codex_pro1
+      SECRET_KEY: codex-prod-session-secret
+      UPLOAD_FOLDER: /app/uploads
     expose:
       - "5000"
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
     restart: unless-stopped
 
   db:
@@ -39,3 +43,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
