@@ -72,10 +72,4 @@ Public traffic goes through `http://<server-ip>:5173` on the frontend container,
 
 Default PostgreSQL settings used by Docker Compose:
 
-- Host: `127.0.0.1`
-- Port: `5432`
-- Database: `codex_pro1`
-- User: `codex`
-- Password: `80238023`
-
 Uploaded images are stored in the backend upload volume and exposed through backend-served `/api/uploads/<filename>` URLs.
