@@ -49,6 +49,13 @@ function AppShell() {
     window.localStorage.setItem("curator-language", language);
   }, [language]);
 
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
+
   async function refreshHealth() {
     try {
       const data = await apiRequest<{ status?: string }>("/api/health");
@@ -97,32 +104,97 @@ function AppShell() {
   };
   const handleRegister = async (payload: RegisterPayload) => { setCurrentUser((await apiRequest<{ user: User }>("/api/auth/register", { method: "POST", body: JSON.stringify(payload) })).user); await refreshPosts(); };
   const handleLogin = async (payload: AuthPayload) => { setCurrentUser((await apiRequest<{ user: User }>("/api/auth/login", { method: "POST", body: JSON.stringify(payload) })).user); await refreshPosts(); };
-  const handleLogout = async () => { await apiRequest<{ message: string }>("/api/auth/logout", { method: "POST" }); setCurrentUser(null); navigate("/"); };
+  const handleLogout = async () => { await apiRequest<{ message: string }>("/api/auth/logout", { method: "POST" }); setCurrentUser(null); setMenuOpen(false); navigate("/"); };
   const handleUploadImages = async (files: FileList | File[]) => { const formData = new FormData(); Array.from(files).forEach((file) => formData.append("images", file)); return (await apiRequest<{ images: UploadedImage[] }>("/api/uploads/images", { method: "POST", body: formData })).images; };
   const handleCreatePost = async (content: string, imageUrls: string[]) => { const data = await apiRequest<{ post: PostItem }>("/api/posts", { method: "POST", body: JSON.stringify({ content, imageUrls }) }); setPosts((current) => [data.post, ...current]); navigate("/"); };
   const ownPosts = currentUser ? posts.filter((post) => post.author.id === currentUser.id) : [];
+  const closeDrawer = () => setMenuOpen(false);
 
   return (
     <main className={`app-shell language-${language}`} data-build={runtimeBuildTag}>
       <div className="ambient ambient--one" aria-hidden="true" />
       <div className="ambient ambient--two" aria-hidden="true" />
       <div className="ambient ambient--three" aria-hidden="true" />
+
       <header className="top-nav">
         <Link className="brand" to="/">Curator</Link>
-        <nav className="top-links">
+
+        <nav className="top-links" aria-label="Primary navigation">
           <NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/" end>{t.navFeed}</NavLink>
           <NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/create">{t.navCreate}</NavLink>
           {currentUser ? <NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/profile">{t.navProfile}</NavLink> : null}
         </nav>
+
         <div className="top-actions">
           <div className="api-chip" data-state={health.status}><span className="api-chip__dot" /><span>{health.message}</span></div>
           <div className="language-switch" role="group" aria-label={t.language}>
             <button className={`language-switch__item ${language === "en" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("en")}>EN</button>
             <button className={`language-switch__item ${language === "zh" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("zh")}>{t.languageZhLabel}</button>
           </div>
-          {currentUser ? <div className="session-cluster"><Link className="session-pill" to="/profile"><span className="avatar-orb">{getInitials(currentUser.displayName)}</span><span className="session-pill__name">{currentUser.displayName}</span></Link><button className="ghost-button" type="button" onClick={() => void handleLogout()}>{t.logout}</button></div> : <div className="session-cluster"><Link className="ghost-link" to="/login">{t.login}</Link><Link className="solid-link" to="/register">{t.join}</Link></div>}
+          {currentUser ? (
+            <div className="session-cluster">
+              <Link className="session-pill" to="/profile"><span className="avatar-orb">{getInitials(currentUser.displayName)}</span><span className="session-pill__name">{currentUser.displayName}</span></Link>
+              <button className="ghost-button" type="button" onClick={() => void handleLogout()}>{t.logout}</button>
+            </div>
+          ) : (
+            <div className="session-cluster">
+              <Link className="ghost-link" to="/login">{t.login}</Link>
+              <Link className="solid-link" to="/register">{t.join}</Link>
+            </div>
+          )}
         </div>
+
+        <button className={`mobile-nav-toggle ${menuOpen ? "is-open" : ""}`} type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((current) => !current)}>
+          <span />
+          <span />
+          <span />
+        </button>
       </header>
+
+      <div className={`mobile-drawer-shell ${menuOpen ? "is-open" : ""}`} aria-hidden={!menuOpen}>
+        <button className="mobile-drawer-shell__backdrop" type="button" aria-label="Close menu" onClick={closeDrawer} />
+        <aside className="mobile-drawer">
+          <div className="mobile-drawer__head">
+            <div>
+              <p className="eyebrow">Curator</p>
+              <strong>{t.navFeed}</strong>
+            </div>
+            <button className="mobile-drawer__close" type="button" aria-label="Close menu" onClick={closeDrawer}>Close</button>
+          </div>
+
+          <nav className="mobile-drawer__nav" aria-label="Mobile navigation">
+            <NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/" end onClick={closeDrawer}>{t.navFeed}</NavLink>
+            <NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/create" onClick={closeDrawer}>{t.navCreate}</NavLink>
+            {currentUser ? <NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/profile" onClick={closeDrawer}>{t.navProfile}</NavLink> : null}
+          </nav>
+
+          <div className="mobile-drawer__block">
+            <div className="language-switch" role="group" aria-label={t.language}>
+              <button className={`language-switch__item ${language === "en" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("en")}>EN</button>
+              <button className={`language-switch__item ${language === "zh" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("zh")}>{t.languageZhLabel}</button>
+            </div>
+          </div>
+
+          <div className="mobile-drawer__block">
+            {currentUser ? (
+              <>
+                <Link className="session-pill" to="/profile" onClick={closeDrawer}><span className="avatar-orb">{getInitials(currentUser.displayName)}</span><span className="session-pill__name">{currentUser.displayName}</span></Link>
+                <button className="ghost-button mobile-drawer__action" type="button" onClick={() => void handleLogout()}>{t.logout}</button>
+              </>
+            ) : (
+              <div className="mobile-drawer__auth">
+                <Link className="ghost-link mobile-drawer__action" to="/login" onClick={closeDrawer}>{t.login}</Link>
+                <Link className="solid-link mobile-drawer__action" to="/register" onClick={closeDrawer}>{t.join}</Link>
+              </div>
+            )}
+          </div>
+
+          <div className="mobile-drawer__status">
+            <div className="api-chip" data-state={health.status}><span className="api-chip__dot" /><span>{health.message}</span></div>
+          </div>
+        </aside>
+      </div>
+
       <Routes>
         <Route path="/" element={<FeedPage currentUser={currentUser} posts={posts} state={feedState} language={language} t={t} onRefresh={() => void refreshPosts()} />} />
         <Route path="/login" element={<LoginPage currentUser={currentUser} onLogin={handleLogin} t={t} />} />
@@ -133,6 +205,7 @@ function AppShell() {
         <Route path="/ritual/zen" element={<RitualPage mode="zen" count={counts.zenHits} state={zenState} bursts={bursts} onTap={handleZenTap} onSwitch={(mode) => navigate(`/ritual/${mode}`)} t={t} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
       <div className={`floating-menu ${menuOpen ? "is-open" : ""}`}>
         <button className="floating-menu__trigger" type="button" onClick={() => setMenuOpen((current) => !current)}><span>{menuOpen ? t.close : t.rituals}</span></button>
         <div className="floating-menu__panel">
@@ -140,10 +213,12 @@ function AppShell() {
           <button className="floating-menu__item" type="button" onClick={() => navigate("/ritual/zen")}><strong>{t.zen}</strong><span>{counts.zenHits}</span></button>
         </div>
       </div>
+
       {activeMode ? <div className="bottom-switch" role="tablist" aria-label="Mode switch"><button type="button" className={`bottom-switch__item ${activeMode === "longing" ? "is-active" : ""}`} onClick={() => navigate("/ritual/longing")}>{t.longing}</button><button type="button" className={`bottom-switch__item ${activeMode === "zen" ? "is-active" : ""}`} onClick={() => navigate("/ritual/zen")}>{t.zen}</button></div> : null}
     </main>
   );
 }
+
 type FeedPageProps = { currentUser: User | null; posts: PostItem[]; state: RequestState; language: Language; t: Dictionary; onRefresh: () => void };
 function FeedPage({ currentUser, posts, state, language, t, onRefresh }: FeedPageProps) {
   return <section className="feed-page"><div className="feed-hero"><div><p className="eyebrow">{t.feedEyebrow}</p><h1>{t.feedTitle}</h1></div><div className="feed-hero__meta"><p>{currentUser ? t.signedInAs(currentUser.displayName) : t.joinPrompt}</p><button className="ghost-button" type="button" onClick={onRefresh}>{t.refresh}</button></div></div>{state === "loading" ? <p className="status-copy status-copy--section">{t.loadingPosts}</p> : null}{state === "error" ? <p className="status-copy status-copy--section">{t.feedUnavailable}</p> : null}{state === "success" && posts.length === 0 ? <div className="empty-state"><p className="eyebrow">{t.noPostsEyebrow}</p><h2>{t.noPostsTitle}</h2><p>{t.noPostsBody}</p></div> : null}<div className="feed-list">{posts.map((post) => <article className="post-row" key={post.id}><div className="post-row__meta">{post.author.avatarUrl ? <img className="avatar-orb avatar-orb--image" src={post.author.avatarUrl} alt={post.author.displayName} /> : <span className="avatar-orb">{getInitials(post.author.displayName)}</span>}<div className="post-row__author"><strong>{post.author.displayName}</strong><p>{formatTimestamp(post.createdAt, language)}</p></div></div>{post.content ? <p className="post-row__content">{post.content}</p> : null}{post.images.length > 0 ? <div className={`post-row__images post-row__images--${post.images.length > 1 ? "grid" : "single"}`}>{post.images.map((image) => <img key={image.id} src={image.url} alt={t.postMediaAlt} loading="lazy" />)}</div> : null}</article>)}</div></section>;
@@ -211,6 +286,7 @@ function CreatePage({ currentUser, onUpload, onPublish, t }: CreatePageProps) {
   if (!currentUser) return <section className="auth-page"><div className="form-shell"><p className="eyebrow">{t.createEyebrow}</p><h1>{t.signInBeforePublish}</h1><p className="status-copy">{t.publishAuthHint}</p><div className="hero-actions"><button className="solid-link solid-link--button" type="button" onClick={() => navigate("/login")}>{t.goToLogin}</button><button className="ghost-button" type="button" onClick={() => navigate("/register")}>{t.createAccount}</button></div></div></section>;
   return <section className="create-page"><div className="create-head"><div><p className="eyebrow">{t.createEyebrow}</p><h1>{t.createTitle}</h1></div><p className="status-copy">{message}</p></div><form className="compose-shell" onSubmit={handleSubmit}><label className="compose-shell__field"><span>{t.text}</span><textarea value={content} onChange={(event) => setContent(event.target.value)} rows={8} placeholder={t.textPlaceholder} /></label><div className="compose-shell__row"><label className="upload-field"><span>{t.addImages}</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple onChange={handleSelectImages} /></label><button className="solid-link solid-link--button" type="submit" disabled={publishState === "loading" || uploadState === "loading"}>{publishState === "loading" ? t.publishing : t.publish}</button></div>{images.length > 0 ? <div className="upload-grid">{images.map((image) => <figure className="upload-grid__item" key={image.url}><img src={image.url} alt={t.uploadedPreviewAlt} /><button type="button" className="ghost-button" onClick={() => setImages((current) => current.filter((item) => item.url !== image.url))}>{t.remove}</button></figure>)}</div> : null}</form></section>;
 }
+
 type ProfilePageProps = { currentUser: User | null; posts: PostItem[]; language: Language; t: Dictionary };
 function ProfilePage({ currentUser, posts, language, t }: ProfilePageProps) {
   if (!currentUser) return <section className="auth-page"><div className="form-shell"><p className="eyebrow">{t.profileEyebrow}</p><h1>{t.noSessionTitle}</h1><p className="status-copy">{t.noSessionHint}</p></div></section>;
