@@ -79,6 +79,7 @@ export type Dictionary = {
   apiUnavailable: string;
 };
 
+export const buildTag = "i18n-refresh-20260326-2";
 export const dictionaries: Record<Language, Dictionary> = {
   en: {
     navFeed: "Feed",

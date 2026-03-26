@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { dictionaries, formatShortDate, formatTimestamp, getInitialLanguage, type Dictionary, type Language } from "./i18n";
+import { buildTag, dictionaries, formatShortDate, formatTimestamp, getInitialLanguage, type Dictionary, type Language } from "./i18n";
 
 type HealthState = { status: "idle" | "loading" | "success" | "error"; message: string };
 type ModeCounts = { longingCount: number; zenHits: number };
@@ -41,6 +41,7 @@ function AppShell() {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [feedState, setFeedState] = useState<RequestState>("loading");
   const t = dictionaries[language];
+  const runtimeBuildTag = buildTag;
   const activeMode = location.pathname.includes("/ritual/zen") ? "zen" : location.pathname.includes("/ritual/longing") ? "longing" : null;
 
   useEffect(() => {
@@ -102,7 +103,7 @@ function AppShell() {
   const ownPosts = currentUser ? posts.filter((post) => post.author.id === currentUser.id) : [];
 
   return (
-    <main className={`app-shell language-${language}`}>
+    <main className={`app-shell language-${language}`} data-build={runtimeBuildTag}>
       <div className="ambient ambient--one" aria-hidden="true" />
       <div className="ambient ambient--two" aria-hidden="true" />
       <div className="ambient ambient--three" aria-hidden="true" />
