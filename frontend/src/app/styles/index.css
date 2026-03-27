@@ -339,3 +339,17 @@ textarea { resize: vertical; min-height: 8rem; }
 
 .settings-anchor { display: inline-flex; }
 
+
+.profile-hero__avatar-stack { display: grid; justify-items: center; gap: 0.6rem; }
+.profile-hero__avatar-edit { min-width: 8rem; }
+.avatar-picker { display: grid; gap: 1rem; }
+.avatar-picker__current { display: flex; align-items: center; gap: 0.9rem; padding: 0.9rem; }
+.avatar-picker__section { display: grid; gap: 0.75rem; }
+.avatar-picker__section-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.avatar-picker__input { display: none; }
+.avatar-picker__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.avatar-picker__option { padding: 0; border: 1px solid var(--border); border-radius: 18px; background: color-mix(in srgb, var(--surface) 90%, transparent); overflow: hidden; }
+.avatar-picker__option img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+.avatar-picker__option.is-active { border-color: color-mix(in srgb, var(--accent) 52%, var(--border)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent); }
+@media (max-width: 640px) { .avatar-picker__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .avatar-picker__section-head, .avatar-picker__current { grid-template-columns: 1fr; display: grid; align-items: stretch; } }
+

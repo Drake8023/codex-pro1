@@ -4,7 +4,7 @@ from functools import wraps
 from pathlib import Path
 from uuid import uuid4
 
-from flask import Blueprint, current_app, jsonify, redirect, request, send_from_directory, session
+from flask import Blueprint, Response, current_app, jsonify, redirect, request, send_from_directory, session
 from sqlalchemy.orm import selectinload
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -17,6 +17,51 @@ api_bp = Blueprint("api", __name__)
 LONGING_COUNTER_ID = 1
 ZEN_COUNTER_ID = 2
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+AVATAR_PRESETS = {
+    "aurora": {
+        "bg": ("#7c9dff", "#ffd4b6"),
+        "shape": "<circle cx='160' cy='132' r='84' fill='rgba(255,255,255,0.28)' /><circle cx='238' cy='84' r='42' fill='rgba(255,255,255,0.22)' />",
+    },
+    "pebble": {
+        "bg": ("#6ab7a8", "#d9f0c7"),
+        "shape": "<rect x='54' y='58' width='204' height='156' rx='78' fill='rgba(255,255,255,0.24)' /><circle cx='124' cy='114' r='34' fill='rgba(255,255,255,0.22)' />",
+    },
+    "sunset": {
+        "bg": ("#ff9e7a", "#ffd66b"),
+        "shape": "<circle cx='160' cy='112' r='76' fill='rgba(255,255,255,0.26)' /><path d='M42 210C90 154 230 154 278 210V320H42Z' fill='rgba(255,255,255,0.18)' />",
+    },
+    "iris": {
+        "bg": ("#8d7bff", "#d9c8ff"),
+        "shape": "<circle cx='102' cy='102' r='46' fill='rgba(255,255,255,0.22)' /><circle cx='218' cy='126' r='66' fill='rgba(255,255,255,0.18)' />",
+    },
+    "mint": {
+        "bg": ("#6ccfbd", "#c6f4dc"),
+        "shape": "<path d='M52 204C96 154 224 146 272 204V320H52Z' fill='rgba(255,255,255,0.2)' /><circle cx='160' cy='118' r='54' fill='rgba(255,255,255,0.24)' />",
+    },
+    "ember": {
+        "bg": ("#ff7b7b", "#ffb86b"),
+        "shape": "<circle cx='160' cy='118' r='70' fill='rgba(255,255,255,0.22)' /><circle cx='102' cy='88' r='30' fill='rgba(255,255,255,0.18)' /><circle cx='226' cy='160' r='26' fill='rgba(255,255,255,0.18)' />",
+    },
+}
+
+
+def _avatar_preset_svg(preset_id: str) -> str | None:
+    preset = AVATAR_PRESETS.get(preset_id)
+    if preset is None:
+        return None
+
+    start, end = preset["bg"]
+    shape = preset["shape"]
+    return f"""<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 320' role='img' aria-label='{preset_id} avatar'>
+  <defs>
+    <linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='{start}' />
+      <stop offset='100%' stop-color='{end}' />
+    </linearGradient>
+  </defs>
+  <rect width='320' height='320' rx='88' fill='url(#g)' />
+  {shape}
+</svg>"""
 
 
 def _json_error(message: str, status: int):
@@ -288,6 +333,29 @@ def login_user():
 def logout_user():
     session.clear()
     return jsonify(message="Signed out")
+
+
+@api_bp.get("/avatar-presets")
+def get_avatar_presets():
+    return jsonify(presets=[{"id": preset_id, "url": f"/api/avatar-presets/{preset_id}.svg"} for preset_id in AVATAR_PRESETS])
+
+
+@api_bp.get("/avatar-presets/<string:preset_id>.svg")
+def get_avatar_preset_svg(preset_id: str):
+    svg = _avatar_preset_svg(preset_id)
+    if svg is None:
+        return _json_error("Avatar preset not found", 404)
+    return Response(svg, mimetype="image/svg+xml")
+
+
+@api_bp.put("/profile/avatar")
+@login_required
+def update_profile_avatar(current_user: User):
+    data = request.get_json(silent=True) or {}
+    avatar_url = str(data.get("avatarUrl", "")).strip() or None
+    current_user.avatar_url = avatar_url
+    db.session.commit()
+    return jsonify(message="Avatar updated", user=_serialize_user(current_user))
 
 
 @api_bp.get("/posts")

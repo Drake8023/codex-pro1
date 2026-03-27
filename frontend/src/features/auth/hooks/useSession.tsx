@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getInitialLanguage, type Language } from "../../../i18n";
-import { getSession, login, logout, register } from "../api";
+import { getSession, login, logout, register, updateAvatar } from "../api";
 import type { AuthPayload, RegisterPayload, User } from "../types";
 
 type SessionContextValue = {
@@ -55,6 +55,19 @@ export function useRegister() {
     onSuccess: (data) => {
       queryClient.setQueryData(["session"], { authenticated: true, user: data.user });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+  });
+}
+
+export function useUpdateAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (avatarUrl: string | null) => updateAvatar(avatarUrl),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["session"], { authenticated: true, user: data.user });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["comments"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

@@ -15,6 +15,14 @@ export type Dictionary = {
   themeDark: string;
   themeLight: string;
   apiStatus: string;
+  editAvatar: string;
+  avatarEditorTitle: string;
+  currentAvatar: string;
+  avatarPickerHint: string;
+  defaultAvatars: string;
+  uploadAvatar: string;
+  uploadCustomAvatar: string;
+  avatarUpdateFailed: string;
   feedEyebrow: string;
   feedTitle: string;
   signedInAs: (name: string) => string;
@@ -118,7 +126,7 @@ export type Dictionary = {
   likedBy: string;
 };
 
-export const buildTag = "i18n-refresh-20260327-3";
+export const buildTag = "i18n-refresh-20260327-4";
 
 export const dictionaries: Record<Language, Dictionary> = {
   en: {
@@ -136,6 +144,14 @@ export const dictionaries: Record<Language, Dictionary> = {
     themeDark: "Dark mode",
     themeLight: "Light mode",
     apiStatus: "API",
+    editAvatar: "Edit avatar",
+    avatarEditorTitle: "Choose your avatar",
+    currentAvatar: "Current avatar",
+    avatarPickerHint: "Pick a default image or upload your own.",
+    defaultAvatars: "Default avatars",
+    uploadAvatar: "Upload",
+    uploadCustomAvatar: "Upload custom avatar",
+    avatarUpdateFailed: "Could not update avatar",
     feedEyebrow: "Private archive",
     feedTitle: "Publish notes, galleries, and small rituals in one quiet stream.",
     signedInAs: (name) => `Signed in as ${name}`,
@@ -253,6 +269,14 @@ export const dictionaries: Record<Language, Dictionary> = {
     themeDark: "深色模式",
     themeLight: "浅色模式",
     apiStatus: "接口状态",
+    editAvatar: "编辑头像",
+    avatarEditorTitle: "选择你的头像",
+    currentAvatar: "当前头像",
+    avatarPickerHint: "可以选默认头像，也可以上传自己的图片。",
+    defaultAvatars: "默认头像",
+    uploadAvatar: "上传",
+    uploadCustomAvatar: "上传自定义头像",
+    avatarUpdateFailed: "头像更新失败",
     feedEyebrow: "私人档案",
     feedTitle: "把文字、图片和一点点仪式感，放进同一条安静的动态里。",
     signedInAs: (name) => `当前登录：${name}`,

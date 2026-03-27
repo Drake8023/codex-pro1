@@ -16,3 +16,7 @@ export function register(payload: RegisterPayload) {
 export function logout() {
   return apiRequest<{ message: string }>("/api/auth/logout", { method: "POST" });
 }
+
+export function updateAvatar(avatarUrl: string | null) {
+  return apiRequest<{ user: User }>("/api/profile/avatar", { method: "PUT", body: JSON.stringify({ avatarUrl }) });
+}
