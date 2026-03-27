@@ -63,6 +63,7 @@ def create_app() -> Flask:
     upload_dir = Path(os.getenv("UPLOAD_FOLDER", str(Path(app.root_path).parent / "instance" / "uploads")))
     upload_dir.mkdir(parents=True, exist_ok=True)
     app.config["UPLOAD_FOLDER"] = upload_dir.as_posix()
+    app.config["REMOTE_UPLOAD_BASE_URL"] = os.getenv("REMOTE_UPLOAD_BASE_URL", "").rstrip("/")
 
     db.init_app(app)
     app.register_blueprint(api_bp, url_prefix="/api")

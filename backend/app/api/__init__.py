@@ -4,13 +4,13 @@ from functools import wraps
 from pathlib import Path
 from uuid import uuid4
 
-from flask import Blueprint, current_app, jsonify, request, send_from_directory, session
+from flask import Blueprint, current_app, jsonify, redirect, request, send_from_directory, session
 from sqlalchemy.orm import selectinload
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import Conversation, ConversationParticipant, DemoCounter, Message, Post, PostComment, PostImage, PostLike, User, utcnow
+from app.models import Conversation, ConversationParticipant, DemoCounter, Message, Notification, Post, PostComment, PostImage, PostLike, User, utcnow
 
 api_bp = Blueprint("api", __name__)
 
@@ -93,6 +93,7 @@ def _serialize_post(post: Post, current_user: User | None = None) -> dict[str, o
         "likeCount": len(post.likes),
         "commentCount": len(post.comments),
         "likedByMe": liked_by_me,
+        "likeUsers": [_serialize_user(like.user) for like in post.likes],
     }
 
 
@@ -103,6 +104,48 @@ def _serialize_message(message: Message) -> dict[str, object]:
         "createdAt": message.created_at.isoformat(),
         "sender": _serialize_user(message.sender),
     }
+
+
+def _serialize_notification(notification: Notification) -> dict[str, object]:
+    actor_name = notification.actor.display_name
+    if notification.kind == "like":
+        body = f"{actor_name} liked your post"
+    elif notification.kind == "reply":
+        body = f"{actor_name} replied to your comment"
+    else:
+        body = f"{actor_name} commented on your post"
+
+    return {
+        "id": notification.id,
+        "kind": notification.kind,
+        "isRead": notification.is_read,
+        "createdAt": notification.created_at.isoformat(),
+        "body": body,
+        "actor": _serialize_user(notification.actor),
+        "postId": notification.post_id,
+        "commentId": notification.comment_id,
+    }
+
+
+def _create_notification(*, user: User, actor: User, post: Post, kind: str, comment: PostComment | None = None) -> None:
+    if user.id == actor.id:
+        return
+
+    existing = db.session.execute(
+        db.select(Notification).where(
+            Notification.user_id == user.id,
+            Notification.actor_user_id == actor.id,
+            Notification.post_id == post.id,
+            Notification.comment_id == (comment.id if comment is not None else None),
+            Notification.kind == kind,
+        )
+    ).scalar_one_or_none()
+    if existing is not None and kind == "like":
+        existing.created_at = utcnow()
+        existing.is_read = False
+        return
+
+    db.session.add(Notification(user=user, actor=actor, post=post, comment=comment, kind=kind, is_read=False))
 
 
 def _serialize_conversation(conversation: Conversation, current_user: User) -> dict[str, object]:
@@ -255,7 +298,7 @@ def get_posts():
         .options(
             selectinload(Post.author),
             selectinload(Post.images),
-            selectinload(Post.likes),
+            selectinload(Post.likes).selectinload(PostLike.user),
             selectinload(Post.comments),
         )
         .order_by(Post.created_at.desc())
@@ -296,7 +339,7 @@ def create_post(current_user: User):
         .options(
             selectinload(Post.author),
             selectinload(Post.images),
-            selectinload(Post.likes),
+            selectinload(Post.likes).selectinload(PostLike.user),
             selectinload(Post.comments),
         )
         .where(Post.id == post.id)
@@ -317,7 +360,9 @@ def toggle_post_like(current_user: User, post_id: int):
 
     liked = False
     if like is None:
-        db.session.add(PostLike(post=post, user=current_user))
+        new_like = PostLike(post=post, user=current_user)
+        db.session.add(new_like)
+        _create_notification(user=post.author, actor=current_user, post=post, kind="like")
         liked = True
     else:
         db.session.delete(like)
@@ -376,6 +421,13 @@ def create_post_comment(current_user: User, post_id: int):
 
     comment = PostComment(post=post, author=current_user, content=content, parent_comment=parent_comment, reply_to_user=reply_to_user)
     db.session.add(comment)
+    db.session.flush()
+
+    if parent_comment is not None:
+        _create_notification(user=parent_comment.author, actor=current_user, post=post, kind="reply", comment=comment)
+    else:
+        _create_notification(user=post.author, actor=current_user, post=post, kind="comment", comment=comment)
+
     db.session.commit()
 
     fresh_comment = _get_post_comment_or_404(comment.id)
@@ -517,9 +569,46 @@ def upload_images(_current_user: User):
     return jsonify(message="Images uploaded", images=saved_images), 201
 
 
+@api_bp.get("/notifications")
+@login_required
+def get_notifications(current_user: User):
+    notifications = db.session.execute(
+        db.select(Notification)
+        .options(selectinload(Notification.actor))
+        .where(Notification.user_id == current_user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(50)
+    ).scalars().all()
+    unread_count = sum(1 for notification in notifications if not notification.is_read)
+    return jsonify(notifications=[_serialize_notification(notification) for notification in notifications], unreadCount=unread_count)
+
+
+@api_bp.post("/notifications/<int:notification_id>/read")
+@login_required
+def mark_notification_read(current_user: User, notification_id: int):
+    notification = db.session.execute(
+        db.select(Notification).where(Notification.id == notification_id, Notification.user_id == current_user.id)
+    ).scalar_one_or_none()
+    if notification is None:
+        return _json_error("Notification not found", 404)
+
+    notification.is_read = True
+    db.session.commit()
+    return jsonify(message="Notification marked as read")
+
+
 @api_bp.get("/uploads/<path:filename>")
 def serve_uploaded_image(filename: str):
-    return send_from_directory(current_app.config["UPLOAD_FOLDER"], filename, max_age=3600)
+    upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
+    local_file = upload_dir / filename
+    if local_file.exists():
+        return send_from_directory(upload_dir, filename, max_age=3600)
+
+    remote_base_url = current_app.config.get("REMOTE_UPLOAD_BASE_URL", "")
+    if remote_base_url:
+        return redirect(f"{remote_base_url}/{filename}", code=307)
+
+    return _json_error("Image not found", 404)
 
 
 @api_bp.get("/modes/state")
