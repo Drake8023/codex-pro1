@@ -336,3 +336,6 @@ textarea { resize: vertical; min-height: 8rem; }
   .comment-item--reply { margin-left: 0.45rem; }
   .uploader__grid--composer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+.settings-anchor { display: inline-flex; }
+

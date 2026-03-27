@@ -54,7 +54,9 @@ function SettingsMenu() {
 
   return (
     <Popover content={content} trigger="click" open={isOpen} onOpenChange={setIsOpen} placement="bottomRight" overlayClassName="settings-popover">
-      <Button variant="ghost" className="settings-trigger" icon={<MenuOutlined />}>{t.settings}</Button>
+      <span className="settings-anchor">
+        <Button variant="ghost" className="settings-trigger" icon={<MenuOutlined />}>{t.settings}</Button>
+      </span>
     </Popover>
   );
 }
