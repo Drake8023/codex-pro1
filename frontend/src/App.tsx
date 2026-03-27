@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { buildTag, dictionaries, formatShortDate, formatTimestamp, getInitialLanguage, type Dictionary, type Language } from "./i18n";
 
 type HealthState = { status: "idle" | "loading" | "success" | "error"; message: string };
@@ -286,7 +286,9 @@ function RitualPage({ mode, count, state, bursts, onTap, onSwitch, t }: { mode: 
 }
 
 export default function App() {
-  return <BrowserRouter><AppShell /></BrowserRouter>;
+  return <AppShell />;
 }
+
+
 
 
