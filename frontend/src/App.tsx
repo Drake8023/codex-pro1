@@ -1,5 +1,5 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+﻿import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { buildTag, dictionaries, formatShortDate, formatTimestamp, getInitialLanguage, type Dictionary, type Language } from "./i18n";
 
 type HealthState = { status: "idle" | "loading" | "success" | "error"; message: string };
@@ -9,21 +9,13 @@ type ModeName = "longing" | "zen";
 type Burst = { id: number; label: string; x: string; y: string };
 type User = { id: number; email: string; displayName: string; avatarUrl: string | null; bio: string | null; createdAt: string; updatedAt: string };
 type PostImage = { id: number; url: string; sortOrder: number };
-type PostComment = { id: number; content: string; createdAt: string; updatedAt: string; author: User };
-type PostItem = {
-  id: number;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-  author: User;
-  images: PostImage[];
-  likeCount: number;
-  commentCount: number;
-  likedByMe: boolean;
-};
+type PostComment = { id: number; content: string; createdAt: string; updatedAt: string; author: User; parentCommentId: number | null; replyToUser: User | null; replies: PostComment[] };
+type PostItem = { id: number; content: string; createdAt: string; updatedAt: string; author: User; images: PostImage[]; likeCount: number; commentCount: number; likedByMe: boolean };
 type UploadedImage = { name: string; url: string };
 type AuthPayload = { email: string; password: string };
 type RegisterPayload = AuthPayload & { displayName: string };
+type CommentPayload = { content: string; parentCommentId?: number; replyToUserId?: number };
+type ReplyTarget = { commentId: number; user: User };
 
 async function apiRequest<T>(input: string, init: RequestInit = {}): Promise<T> {
   const isFormData = init.body instanceof FormData;
@@ -125,150 +117,23 @@ function AppShell() {
     return data;
   };
   const handleLoadComments = async (postId: number) => (await apiRequest<{ comments: PostComment[] }>(`/api/posts/${postId}/comments`)).comments;
-  const handleCreateComment = async (postId: number, content: string) => {
-    const data = await apiRequest<{ comment: PostComment; commentCount: number }>(`/api/posts/${postId}/comments`, {
-      method: "POST",
-      body: JSON.stringify({ content }),
-    });
+  const handleCreateComment = async (postId: number, payload: CommentPayload) => {
+    const data = await apiRequest<{ comment: PostComment; commentCount: number }>(`/api/posts/${postId}/comments`, { method: "POST", body: JSON.stringify(payload) });
     setPosts((current) => current.map((post) => (post.id === postId ? { ...post, commentCount: data.commentCount } : post)));
     return data;
   };
   const ownPosts = currentUser ? posts.filter((post) => post.author.id === currentUser.id) : [];
   const closeDrawer = () => setMobileMenuOpen(false);
 
-  return (
-    <main className={`app-shell language-${language}`} data-build={runtimeBuildTag}>
-      <div className="ambient ambient--one" aria-hidden="true" />
-      <div className="ambient ambient--two" aria-hidden="true" />
-      <div className="ambient ambient--three" aria-hidden="true" />
-
-      <header className="top-nav">
-        <Link className="brand" to="/">Curator</Link>
-
-        <nav className="top-links" aria-label="Primary navigation">
-          <NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/" end>{t.navFeed}</NavLink>
-          <NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/create">{t.navCreate}</NavLink>
-          {currentUser ? <NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/profile">{t.navProfile}</NavLink> : null}
-        </nav>
-
-        <div className="top-actions">
-          <div className="api-chip" data-state={health.status}><span className="api-chip__dot" /><span>{health.message}</span></div>
-          <div className="language-switch" role="group" aria-label={t.language}>
-            <button className={`language-switch__item ${language === "en" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("en")}>EN</button>
-            <button className={`language-switch__item ${language === "zh" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("zh")}>{t.languageZhLabel}</button>
-          </div>
-          {currentUser ? (
-            <div className="session-cluster">
-              <Link className="session-pill" to="/profile"><span className="avatar-orb">{getInitials(currentUser.displayName)}</span><span className="session-pill__name">{currentUser.displayName}</span></Link>
-              <button className="ghost-button" type="button" onClick={() => void handleLogout()}>{t.logout}</button>
-            </div>
-          ) : (
-            <div className="session-cluster">
-              <Link className="ghost-link" to="/login">{t.login}</Link>
-              <Link className="solid-link" to="/register">{t.join}</Link>
-            </div>
-          )}
-        </div>
-
-        <button className={`mobile-nav-toggle ${mobileMenuOpen ? "is-open" : ""}`} type="button" aria-label={mobileMenuOpen ? "Close menu" : "Open menu"} aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((current) => !current)}>
-          <span />
-          <span />
-          <span />
-        </button>
-      </header>
-
-      <div className={`mobile-drawer-shell ${mobileMenuOpen ? "is-open" : ""}`} aria-hidden={!mobileMenuOpen}>
-        <button className="mobile-drawer-shell__backdrop" type="button" aria-label="Close menu" onClick={closeDrawer} />
-        <aside className="mobile-drawer">
-          <div className="mobile-drawer__head">
-            <div>
-              <p className="eyebrow">Curator</p>
-              <strong>{t.navFeed}</strong>
-            </div>
-            <button className="mobile-drawer__close" type="button" aria-label="Close menu" onClick={closeDrawer}>Close</button>
-          </div>
-
-          <nav className="mobile-drawer__nav" aria-label="Mobile navigation">
-            <NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/" end onClick={closeDrawer}>{t.navFeed}</NavLink>
-            <NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/create" onClick={closeDrawer}>{t.navCreate}</NavLink>
-            {currentUser ? <NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/profile" onClick={closeDrawer}>{t.navProfile}</NavLink> : null}
-          </nav>
-
-          <div className="mobile-drawer__block">
-            <div className="language-switch" role="group" aria-label={t.language}>
-              <button className={`language-switch__item ${language === "en" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("en")}>EN</button>
-              <button className={`language-switch__item ${language === "zh" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("zh")}>{t.languageZhLabel}</button>
-            </div>
-          </div>
-
-          <div className="mobile-drawer__block">
-            {currentUser ? (
-              <>
-                <Link className="session-pill" to="/profile" onClick={closeDrawer}><span className="avatar-orb">{getInitials(currentUser.displayName)}</span><span className="session-pill__name">{currentUser.displayName}</span></Link>
-                <button className="ghost-button mobile-drawer__action" type="button" onClick={() => void handleLogout()}>{t.logout}</button>
-              </>
-            ) : (
-              <div className="mobile-drawer__auth">
-                <Link className="ghost-link mobile-drawer__action" to="/login" onClick={closeDrawer}>{t.login}</Link>
-                <Link className="solid-link mobile-drawer__action" to="/register" onClick={closeDrawer}>{t.join}</Link>
-              </div>
-            )}
-          </div>
-
-          <div className="mobile-drawer__status">
-            <div className="api-chip" data-state={health.status}><span className="api-chip__dot" /><span>{health.message}</span></div>
-          </div>
-        </aside>
-      </div>
-
-      <Routes>
-        <Route path="/" element={<FeedPage currentUser={currentUser} posts={posts} state={feedState} language={language} t={t} onRefresh={() => void refreshPosts()} onToggleLike={handleToggleLike} onLoadComments={handleLoadComments} onCreateComment={handleCreateComment} />} />
-        <Route path="/login" element={<LoginPage currentUser={currentUser} onLogin={handleLogin} t={t} />} />
-        <Route path="/register" element={<RegisterPage currentUser={currentUser} onRegister={handleRegister} t={t} />} />
-        <Route path="/create" element={<CreatePage currentUser={currentUser} onUpload={handleUploadImages} onPublish={handleCreatePost} t={t} />} />
-        <Route path="/profile" element={<ProfilePage currentUser={currentUser} posts={ownPosts} language={language} t={t} />} />
-        <Route path="/ritual/longing" element={<RitualPage mode="longing" count={counts.longingCount} state={longingState} bursts={bursts} onTap={handleLongingTap} onSwitch={(mode) => navigate(`/ritual/${mode}`)} t={t} />} />
-        <Route path="/ritual/zen" element={<RitualPage mode="zen" count={counts.zenHits} state={zenState} bursts={bursts} onTap={handleZenTap} onSwitch={(mode) => navigate(`/ritual/${mode}`)} t={t} />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-
-      <div className={`floating-menu ${ritualMenuOpen ? "is-open" : ""}`}>
-        <button className="floating-menu__trigger" type="button" onClick={() => setRitualMenuOpen((current) => !current)}><span>{ritualMenuOpen ? t.close : t.rituals}</span></button>
-        <div className="floating-menu__panel">
-          <button className="floating-menu__item" type="button" onClick={() => navigate("/ritual/longing")}><strong>{t.longing}</strong><span>{counts.longingCount}</span></button>
-          <button className="floating-menu__item" type="button" onClick={() => navigate("/ritual/zen")}><strong>{t.zen}</strong><span>{counts.zenHits}</span></button>
-        </div>
-      </div>
-
-      {activeMode ? <div className="bottom-switch" role="tablist" aria-label="Mode switch"><button type="button" className={`bottom-switch__item ${activeMode === "longing" ? "is-active" : ""}`} onClick={() => navigate("/ritual/longing")}>{t.longing}</button><button type="button" className={`bottom-switch__item ${activeMode === "zen" ? "is-active" : ""}`} onClick={() => navigate("/ritual/zen")}>{t.zen}</button></div> : null}
-    </main>
-  );
+  return <main className={`app-shell language-${language}`} data-build={runtimeBuildTag}><div className="ambient ambient--one" aria-hidden="true" /><div className="ambient ambient--two" aria-hidden="true" /><div className="ambient ambient--three" aria-hidden="true" /><header className="top-nav"><Link className="brand" to="/">Curator</Link><nav className="top-links" aria-label="Primary navigation"><NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/" end>{t.navFeed}</NavLink><NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/create">{t.navCreate}</NavLink>{currentUser ? <NavLink className={({ isActive }) => `top-link ${isActive ? "is-active" : ""}`} to="/profile">{t.navProfile}</NavLink> : null}</nav><div className="top-actions"><div className="api-chip" data-state={health.status}><span className="api-chip__dot" /><span>{health.message}</span></div><div className="language-switch" role="group" aria-label={t.language}><button className={`language-switch__item ${language === "en" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("en")}>EN</button><button className={`language-switch__item ${language === "zh" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("zh")}>{t.languageZhLabel}</button></div>{currentUser ? <div className="session-cluster"><Link className="session-pill" to="/profile"><span className="avatar-orb">{getInitials(currentUser.displayName)}</span><span className="session-pill__name">{currentUser.displayName}</span></Link><button className="ghost-button" type="button" onClick={() => void handleLogout()}>{t.logout}</button></div> : <div className="session-cluster"><Link className="ghost-link" to="/login">{t.login}</Link><Link className="solid-link" to="/register">{t.join}</Link></div>}</div><button className={`mobile-nav-toggle ${mobileMenuOpen ? "is-open" : ""}`} type="button" aria-label={mobileMenuOpen ? "Close menu" : "Open menu"} aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((current) => !current)}><span /><span /><span /></button></header><div className={`mobile-drawer-shell ${mobileMenuOpen ? "is-open" : ""}`} aria-hidden={!mobileMenuOpen}><button className="mobile-drawer-shell__backdrop" type="button" aria-label="Close menu" onClick={closeDrawer} /><aside className="mobile-drawer"><div className="mobile-drawer__head"><div><p className="eyebrow">Curator</p><strong>{t.navFeed}</strong></div><button className="mobile-drawer__close" type="button" aria-label="Close menu" onClick={closeDrawer}>Close</button></div><nav className="mobile-drawer__nav" aria-label="Mobile navigation"><NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/" end onClick={closeDrawer}>{t.navFeed}</NavLink><NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/create" onClick={closeDrawer}>{t.navCreate}</NavLink>{currentUser ? <NavLink className={({ isActive }) => `mobile-drawer__link ${isActive ? "is-active" : ""}`} to="/profile" onClick={closeDrawer}>{t.navProfile}</NavLink> : null}</nav><div className="mobile-drawer__block"><div className="language-switch" role="group" aria-label={t.language}><button className={`language-switch__item ${language === "en" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("en")}>EN</button><button className={`language-switch__item ${language === "zh" ? "is-active" : ""}`} type="button" onClick={() => setLanguage("zh")}>{t.languageZhLabel}</button></div></div><div className="mobile-drawer__block">{currentUser ? <><Link className="session-pill" to="/profile" onClick={closeDrawer}><span className="avatar-orb">{getInitials(currentUser.displayName)}</span><span className="session-pill__name">{currentUser.displayName}</span></Link><button className="ghost-button mobile-drawer__action" type="button" onClick={() => void handleLogout()}>{t.logout}</button></> : <div className="mobile-drawer__auth"><Link className="ghost-link mobile-drawer__action" to="/login" onClick={closeDrawer}>{t.login}</Link><Link className="solid-link mobile-drawer__action" to="/register" onClick={closeDrawer}>{t.join}</Link></div>}</div><div className="mobile-drawer__status"><div className="api-chip" data-state={health.status}><span className="api-chip__dot" /><span>{health.message}</span></div></div></aside></div><Routes><Route path="/" element={<FeedPage currentUser={currentUser} posts={posts} state={feedState} language={language} t={t} onRefresh={() => void refreshPosts()} onToggleLike={handleToggleLike} onLoadComments={handleLoadComments} onCreateComment={handleCreateComment} />} /><Route path="/login" element={<LoginPage currentUser={currentUser} onLogin={handleLogin} t={t} />} /><Route path="/register" element={<RegisterPage currentUser={currentUser} onRegister={handleRegister} t={t} />} /><Route path="/create" element={<CreatePage currentUser={currentUser} onUpload={handleUploadImages} onPublish={handleCreatePost} t={t} />} /><Route path="/profile" element={<ProfilePage currentUser={currentUser} posts={ownPosts} language={language} t={t} />} /><Route path="/ritual/longing" element={<RitualPage mode="longing" count={counts.longingCount} state={longingState} bursts={bursts} onTap={handleLongingTap} onSwitch={(mode) => navigate(`/ritual/${mode}`)} t={t} />} /><Route path="/ritual/zen" element={<RitualPage mode="zen" count={counts.zenHits} state={zenState} bursts={bursts} onTap={handleZenTap} onSwitch={(mode) => navigate(`/ritual/${mode}`)} t={t} />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes><div className={`floating-menu ${ritualMenuOpen ? "is-open" : ""}`}><button className="floating-menu__trigger" type="button" onClick={() => setRitualMenuOpen((current) => !current)}><span>{ritualMenuOpen ? t.close : t.rituals}</span></button><div className="floating-menu__panel"><button className="floating-menu__item" type="button" onClick={() => navigate("/ritual/longing")}><strong>{t.longing}</strong><span>{counts.longingCount}</span></button><button className="floating-menu__item" type="button" onClick={() => navigate("/ritual/zen")}><strong>{t.zen}</strong><span>{counts.zenHits}</span></button></div></div>{activeMode ? <div className="bottom-switch" role="tablist" aria-label="Mode switch"><button type="button" className={`bottom-switch__item ${activeMode === "longing" ? "is-active" : ""}`} onClick={() => navigate("/ritual/longing")}>{t.longing}</button><button type="button" className={`bottom-switch__item ${activeMode === "zen" ? "is-active" : ""}`} onClick={() => navigate("/ritual/zen")}>{t.zen}</button></div> : null}</main>;
 }
 
-type FeedPageProps = {
-  currentUser: User | null;
-  posts: PostItem[];
-  state: RequestState;
-  language: Language;
-  t: Dictionary;
-  onRefresh: () => void;
-  onToggleLike: (postId: number) => Promise<{ likeCount: number; likedByMe: boolean }>;
-  onLoadComments: (postId: number) => Promise<PostComment[]>;
-  onCreateComment: (postId: number, content: string) => Promise<{ comment: PostComment; commentCount: number }>;
-};
+type FeedPageProps = { currentUser: User | null; posts: PostItem[]; state: RequestState; language: Language; t: Dictionary; onRefresh: () => void; onToggleLike: (postId: number) => Promise<{ likeCount: number; likedByMe: boolean }>; onLoadComments: (postId: number) => Promise<PostComment[]>; onCreateComment: (postId: number, payload: CommentPayload) => Promise<{ comment: PostComment; commentCount: number }> };
 function FeedPage({ currentUser, posts, state, language, t, onRefresh, onToggleLike, onLoadComments, onCreateComment }: FeedPageProps) {
   return <section className="feed-page"><div className="feed-hero"><div><p className="eyebrow">{t.feedEyebrow}</p><h1>{t.feedTitle}</h1></div><div className="feed-hero__meta"><p>{currentUser ? t.signedInAs(currentUser.displayName) : t.joinPrompt}</p><button className="ghost-button" type="button" onClick={onRefresh}>{t.refresh}</button></div></div>{state === "loading" ? <p className="status-copy status-copy--section">{t.loadingPosts}</p> : null}{state === "error" ? <p className="status-copy status-copy--section">{t.feedUnavailable}</p> : null}{state === "success" && posts.length === 0 ? <div className="empty-state"><p className="eyebrow">{t.noPostsEyebrow}</p><h2>{t.noPostsTitle}</h2><p>{t.noPostsBody}</p></div> : null}<div className="feed-list">{posts.map((post) => <FeedPostCard key={post.id} currentUser={currentUser} post={post} language={language} t={t} onToggleLike={onToggleLike} onLoadComments={onLoadComments} onCreateComment={onCreateComment} />)}</div></section>;
 }
 
-type FeedPostCardProps = {
-  currentUser: User | null;
-  post: PostItem;
-  language: Language;
-  t: Dictionary;
-  onToggleLike: (postId: number) => Promise<{ likeCount: number; likedByMe: boolean }>;
-  onLoadComments: (postId: number) => Promise<PostComment[]>;
-  onCreateComment: (postId: number, content: string) => Promise<{ comment: PostComment; commentCount: number }>;
-};
+type FeedPostCardProps = { currentUser: User | null; post: PostItem; language: Language; t: Dictionary; onToggleLike: (postId: number) => Promise<{ likeCount: number; likedByMe: boolean }>; onLoadComments: (postId: number) => Promise<PostComment[]>; onCreateComment: (postId: number, payload: CommentPayload) => Promise<{ comment: PostComment; commentCount: number }> };
 function FeedPostCard({ currentUser, post, language, t, onToggleLike, onLoadComments, onCreateComment }: FeedPostCardProps) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -277,45 +142,33 @@ function FeedPostCard({ currentUser, post, language, t, onToggleLike, onLoadComm
   const [commentSubmitState, setCommentSubmitState] = useState<RequestState>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [likeState, setLikeState] = useState<RequestState>("idle");
+  const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
 
+  const loadComments = async () => {
+    setCommentsState("loading");
+    try { setComments(await onLoadComments(post.id)); setCommentsState("success"); } catch (error) { setCommentsState("error"); setStatusMessage(error instanceof Error ? error.message : t.commentsLoadFailed); }
+  };
   const toggleComments = async () => {
     const nextOpen = !commentsOpen;
     setCommentsOpen(nextOpen);
-    if (!nextOpen || commentsState === "loading" || commentsState === "success") return;
-    setCommentsState("loading");
-    setStatusMessage("");
-    try {
-      setComments(await onLoadComments(post.id));
-      setCommentsState("success");
-    } catch (error) {
-      setCommentsState("error");
-      setStatusMessage(error instanceof Error ? error.message : t.commentsLoadFailed);
-    }
+    if (nextOpen && commentsState === "idle") { setStatusMessage(""); await loadComments(); }
   };
-
   const handleLike = async () => {
     setLikeState("loading");
     setStatusMessage("");
-    try {
-      await onToggleLike(post.id);
-      setLikeState("success");
-    } catch (error) {
-      setLikeState("error");
-      setStatusMessage(error instanceof Error ? error.message : t.likeFailed);
-    }
+    try { await onToggleLike(post.id); setLikeState("success"); } catch (error) { setLikeState("error"); setStatusMessage(error instanceof Error ? error.message : t.likeFailed); }
   };
-
   const handleCommentSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!commentDraft.trim()) return;
     setCommentSubmitState("loading");
     setStatusMessage("");
     try {
-      const data = await onCreateComment(post.id, commentDraft.trim());
-      setComments((current) => [...current, data.comment]);
+      await onCreateComment(post.id, { content: commentDraft.trim(), parentCommentId: replyTarget?.commentId, replyToUserId: replyTarget?.user.id });
+      await loadComments();
       setCommentsOpen(true);
-      setCommentsState("success");
       setCommentDraft("");
+      setReplyTarget(null);
       setCommentSubmitState("success");
     } catch (error) {
       setCommentSubmitState("error");
@@ -323,7 +176,32 @@ function FeedPostCard({ currentUser, post, language, t, onToggleLike, onLoadComm
     }
   };
 
-  return <article className="post-row"><div className="post-row__meta">{post.author.avatarUrl ? <img className="avatar-orb avatar-orb--image" src={post.author.avatarUrl} alt={post.author.displayName} /> : <span className="avatar-orb">{getInitials(post.author.displayName)}</span>}<div className="post-row__author"><strong>{post.author.displayName}</strong><p>{formatTimestamp(post.createdAt, language)}</p></div></div>{post.content ? <p className="post-row__content">{post.content}</p> : null}{post.images.length > 0 ? <div className={`post-row__images post-row__images--${post.images.length > 1 ? "grid" : "single"}`}>{post.images.map((image) => <img key={image.id} src={image.url} alt={t.postMediaAlt} loading="lazy" />)}</div> : null}<div className="post-row__actions"><button className={`post-action ${post.likedByMe ? "is-active" : ""}`} type="button" onClick={() => void handleLike()} disabled={!currentUser || likeState === "loading"} title={currentUser ? t.like : t.authRequiredAction}><span>{post.likedByMe ? t.liked : t.like}</span><strong>{post.likeCount}</strong></button><button className={`post-action ${commentsOpen ? "is-active" : ""}`} type="button" onClick={() => void toggleComments()}><span>{t.comments}</span><strong>{post.commentCount}</strong></button></div>{statusMessage ? <p className="status-copy post-row__status">{statusMessage}</p> : null}{commentsOpen ? <div className="comments-panel">{commentsState === "loading" ? <p className="status-copy">{t.loadingComments}</p> : null}{commentsState === "success" && comments.length === 0 ? <p className="status-copy">{t.noComments}</p> : null}{comments.length > 0 ? <div className="comments-list">{comments.map((comment) => <article className="comment-row" key={comment.id}><div className="comment-row__meta"><strong>{comment.author.displayName}</strong><span>{formatTimestamp(comment.createdAt, language)}</span></div><p>{comment.content}</p></article>)}</div> : null}<form className="comment-form" onSubmit={handleCommentSubmit}><label className="compose-shell__field"><span>{t.addComment}</span><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} rows={3} placeholder={currentUser ? t.commentPlaceholder : t.signInToComment} disabled={!currentUser || commentSubmitState === "loading"} /></label><button className="solid-link solid-link--button" type="submit" disabled={!currentUser || commentSubmitState === "loading" || !commentDraft.trim()}>{commentSubmitState === "loading" ? t.sendingComment : t.publishComment}</button></form></div> : null}</article>;
+  return <article className="post-row"><div className="post-row__meta">{post.author.avatarUrl ? <img className="avatar-orb avatar-orb--image" src={post.author.avatarUrl} alt={post.author.displayName} /> : <span className="avatar-orb">{getInitials(post.author.displayName)}</span>}<div className="post-row__author"><strong>{post.author.displayName}</strong><p>{formatTimestamp(post.createdAt, language)}</p></div></div>{post.content ? <p className="post-row__content">{post.content}</p> : null}{post.images.length > 0 ? <PostImageGallery images={post.images} postLabel={post.author.displayName} t={t} /> : null}<div className="post-row__actions"><button className={`post-action ${post.likedByMe ? "is-active" : ""}`} type="button" onClick={() => void handleLike()} disabled={!currentUser || likeState === "loading"} title={currentUser ? t.like : t.authRequiredAction}><span>{post.likedByMe ? t.liked : t.like}</span><strong>{post.likeCount}</strong></button><button className={`post-action ${commentsOpen ? "is-active" : ""}`} type="button" onClick={() => void toggleComments()}><span>{t.comments}</span><strong>{post.commentCount}</strong></button></div>{statusMessage ? <p className="status-copy post-row__status">{statusMessage}</p> : null}{commentsOpen ? <div className="comments-panel">{commentsState === "loading" ? <p className="status-copy">{t.loadingComments}</p> : null}{commentsState === "success" && comments.length === 0 ? <p className="status-copy">{t.noComments}</p> : null}{comments.length > 0 ? <div className="comments-list">{comments.map((comment) => <CommentThread key={comment.id} comment={comment} language={language} t={t} onReply={(user) => setReplyTarget({ commentId: comment.id, user })} />)}</div> : null}<form className="comment-form" onSubmit={handleCommentSubmit}>{replyTarget ? <div className="reply-pill"><span>{t.replyingTo(replyTarget.user.displayName)}</span><button type="button" className="ghost-button" onClick={() => setReplyTarget(null)}>{t.cancelReply}</button></div> : null}<label className="compose-shell__field"><span>{replyTarget ? t.reply : t.addComment}</span><textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} rows={3} placeholder={currentUser ? (replyTarget ? t.replyPlaceholder(replyTarget.user.displayName) : t.commentPlaceholder) : t.signInToComment} disabled={!currentUser || commentSubmitState === "loading"} /></label><button className="solid-link solid-link--button" type="submit" disabled={!currentUser || commentSubmitState === "loading" || !commentDraft.trim()}>{commentSubmitState === "loading" ? t.sendingComment : t.publishComment}</button></form></div> : null}</article>;
+}
+
+function CommentThread({ comment, language, t, onReply }: { comment: PostComment; language: Language; t: Dictionary; onReply: (user: User) => void }) {
+  return <article className="comment-thread"><div className="comment-row"><div className="comment-row__meta"><strong>{comment.author.displayName}</strong><span>{formatTimestamp(comment.createdAt, language)}</span></div><p>{comment.content}</p><div className="comment-row__actions"><button type="button" className="comment-link" onClick={() => onReply(comment.author)}>{t.reply}</button></div></div>{comment.replies.length > 0 ? <div className="comment-replies">{comment.replies.map((reply) => <article className="comment-row comment-row--reply" key={reply.id}><div className="comment-row__meta"><strong>{reply.author.displayName}</strong><span>{formatTimestamp(reply.createdAt, language)}</span></div><p><span className="comment-reply-target">{reply.replyToUser ? t.replyTo(reply.replyToUser.displayName) : null}</span>{reply.content}</p></article>)}</div> : null}</article>;
+}
+
+function PostImageGallery({ images, postLabel, t }: { images: PostImage[]; postLabel: string; t: Dictionary }) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [index, setIndex] = useState(0);
+  const scrollToIndex = (nextIndex: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const clamped = Math.max(0, Math.min(images.length - 1, nextIndex));
+    track.scrollTo({ left: track.clientWidth * clamped, behavior: "smooth" });
+    setIndex(clamped);
+  };
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const handleScroll = () => setIndex(Math.round(track.scrollLeft / Math.max(track.clientWidth, 1)));
+    track.addEventListener("scroll", handleScroll, { passive: true });
+    return () => track.removeEventListener("scroll", handleScroll);
+  }, [images.length]);
+  if (images.length === 1) return <div className="post-row__images post-row__images--single"><img src={images[0].url} alt={`${postLabel} ${t.postMediaAlt}`} loading="lazy" /></div>;
+  return <div className="image-carousel"><div className="image-carousel__track" ref={trackRef}>{images.map((image) => <div className="image-carousel__slide" key={image.id}><img src={image.url} alt={`${postLabel} ${t.postMediaAlt}`} loading="lazy" /></div>)}</div><div className="image-carousel__footer"><button type="button" className="carousel-arrow" onClick={() => scrollToIndex(index - 1)} disabled={index === 0}>{t.previous}</button><div className="carousel-dots">{images.map((image, imageIndex) => <button key={image.id} type="button" className={`carousel-dot ${imageIndex === index ? "is-active" : ""}`} aria-label={t.goToImage(imageIndex + 1)} onClick={() => scrollToIndex(imageIndex)} />)}</div><button type="button" className="carousel-arrow" onClick={() => scrollToIndex(index + 1)} disabled={index === images.length - 1}>{t.next}</button></div></div>;
 }
 
 type LoginPageProps = { currentUser: User | null; onLogin: (payload: AuthPayload) => Promise<void>; t: Dictionary };
@@ -335,12 +213,7 @@ function LoginPage({ currentUser, onLogin, t }: LoginPageProps) {
   const [message, setMessage] = useState(t.loginHint);
   useEffect(() => { if (state === "idle") setMessage(t.loginHint); }, [t.loginHint, state]);
   if (currentUser) return <Navigate to="/" replace />;
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setState("loading");
-    setMessage(t.signingIn);
-    try { await onLogin({ email, password }); setState("success"); navigate("/"); } catch (error) { setState("error"); setMessage(error instanceof Error ? error.message : t.loginFailed); }
-  };
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setState("loading"); setMessage(t.signingIn); try { await onLogin({ email, password }); setState("success"); navigate("/"); } catch (error) { setState("error"); setMessage(error instanceof Error ? error.message : t.loginFailed); } };
   return <section className="auth-page"><div className="form-shell"><p className="eyebrow">{t.loginEyebrow}</p><h1>{t.loginTitle}</h1><p className="status-copy">{message}</p><form className="auth-form" onSubmit={handleSubmit}><label><span>{t.email}</span><input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required /></label><label><span>{t.password}</span><input value={password} onChange={(event) => setPassword(event.target.value)} type="password" required /></label><button className="solid-link solid-link--button" type="submit" disabled={state === "loading"}>{state === "loading" ? t.working : t.loginButton}</button></form></div></section>;
 }
 
@@ -354,57 +227,66 @@ function RegisterPage({ currentUser, onRegister, t }: RegisterPageProps) {
   const [message, setMessage] = useState(t.registerHint);
   useEffect(() => { if (state === "idle") setMessage(t.registerHint); }, [t.registerHint, state]);
   if (currentUser) return <Navigate to="/" replace />;
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setState("loading");
-    setMessage(t.creatingAccount);
-    try { await onRegister({ displayName, email, password }); setState("success"); navigate("/"); } catch (error) { setState("error"); setMessage(error instanceof Error ? error.message : t.registerFailed); }
-  };
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setState("loading"); setMessage(t.creatingAccount); try { await onRegister({ displayName, email, password }); setState("success"); navigate("/"); } catch (error) { setState("error"); setMessage(error instanceof Error ? error.message : t.registerFailed); } };
   return <section className="auth-page"><div className="form-shell"><p className="eyebrow">{t.registerEyebrow}</p><h1>{t.registerTitle}</h1><p className="status-copy">{message}</p><form className="auth-form" onSubmit={handleSubmit}><label><span>{t.displayName}</span><input value={displayName} onChange={(event) => setDisplayName(event.target.value)} type="text" required /></label><label><span>{t.email}</span><input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required /></label><label><span>{t.password}</span><input value={password} onChange={(event) => setPassword(event.target.value)} type="password" minLength={6} required /></label><button className="solid-link solid-link--button" type="submit" disabled={state === "loading"}>{state === "loading" ? t.working : t.createAccount}</button></form></div></section>;
 }
 
 type CreatePageProps = { currentUser: User | null; onUpload: (files: FileList | File[]) => Promise<UploadedImage[]>; onPublish: (content: string, imageUrls: string[]) => Promise<void>; t: Dictionary };
 function CreatePage({ currentUser, onUpload, onPublish, t }: CreatePageProps) {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [content, setContent] = useState("");
   const [images, setImages] = useState<UploadedImage[]>([]);
-  const [uploadState, setUploadState] = useState<RequestState>("idle");
-  const [publishState, setPublishState] = useState<RequestState>("idle");
+  const [status, setStatus] = useState<RequestState>("idle");
   const [message, setMessage] = useState(t.createHint);
-  useEffect(() => { if (uploadState === "idle" && publishState === "idle") setMessage(t.createHint); }, [t.createHint, uploadState, publishState]);
-  const handleSelectImages = async (event: ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => { if (status === "idle") setMessage(t.createHint); }, [status, t.createHint]);
+  if (!currentUser) return <section className="auth-page"><div className="form-shell"><p className="eyebrow">{t.createEyebrow}</p><h1>{t.signInBeforePublish}</h1><p className="status-copy">{t.publishAuthHint}</p><Link className="solid-link" to="/login">{t.goToLogin}</Link></div></section>;
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-    setUploadState("loading");
+    setStatus("loading");
     setMessage(t.uploadInProgress);
-    try { const uploaded = await onUpload(files); setImages((current) => [...current, ...uploaded]); setUploadState("success"); setMessage(t.uploadReady); event.target.value = ""; } catch (error) { setUploadState("error"); setMessage(error instanceof Error ? error.message : t.uploadFailed); }
+    try {
+      const uploaded = await onUpload(files);
+      setImages((current) => [...current, ...uploaded]);
+      setStatus("success");
+      setMessage(t.uploadReady);
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : t.uploadFailed);
+    } finally {
+      event.target.value = "";
+    }
   };
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setPublishState("loading");
+    setStatus("loading");
     setMessage(t.publishing);
-    try { await onPublish(content, images.map((image) => image.url)); setPublishState("success"); } catch (error) { setPublishState("error"); setMessage(error instanceof Error ? error.message : t.publishFailed); }
+    try {
+      await onPublish(content.trim(), images.map((image) => image.url));
+      setStatus("success");
+      setMessage(t.saved);
+      navigate("/");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : t.publishFailed);
+    }
   };
-  if (!currentUser) return <section className="auth-page"><div className="form-shell"><p className="eyebrow">{t.createEyebrow}</p><h1>{t.signInBeforePublish}</h1><p className="status-copy">{t.publishAuthHint}</p><div className="hero-actions"><button className="solid-link solid-link--button" type="button" onClick={() => navigate("/login")}>{t.goToLogin}</button><button className="ghost-button" type="button" onClick={() => navigate("/register")}>{t.createAccount}</button></div></div></section>;
-  return <section className="create-page"><div className="create-head"><div><p className="eyebrow">{t.createEyebrow}</p><h1>{t.createTitle}</h1></div><p className="status-copy">{message}</p></div><form className="compose-shell" onSubmit={handleSubmit}><label className="compose-shell__field"><span>{t.text}</span><textarea value={content} onChange={(event) => setContent(event.target.value)} rows={8} placeholder={t.textPlaceholder} /></label><div className="compose-shell__row"><label className="upload-field"><span>{t.addImages}</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple onChange={handleSelectImages} /></label><button className="solid-link solid-link--button" type="submit" disabled={publishState === "loading" || uploadState === "loading"}>{publishState === "loading" ? t.publishing : t.publish}</button></div>{images.length > 0 ? <div className="upload-grid">{images.map((image) => <figure className="upload-grid__item" key={image.url}><img src={image.url} alt={t.uploadedPreviewAlt} /><button type="button" className="ghost-button" onClick={() => setImages((current) => current.filter((item) => item.url !== image.url))}>{t.remove}</button></figure>)}</div> : null}</form></section>;
+  return <section className="create-page"><div className="compose-shell"><div className="compose-shell__intro"><p className="eyebrow">{t.createEyebrow}</p><h1>{t.createTitle}</h1><p>{message}</p></div><form className="compose-shell__form" onSubmit={handleSubmit}><label className="compose-shell__field"><span>{t.text}</span><textarea value={content} onChange={(event) => setContent(event.target.value)} rows={6} placeholder={t.textPlaceholder} /></label><div className="compose-shell__field"><div className="compose-shell__label-row"><span>{t.addImages}</span><small>{t.uploadTip}</small></div><input ref={fileInputRef} className="uploader-input" type="file" accept="image/*" multiple onChange={(event) => void handleFileChange(event)} /><div className="uploader-shell">{images.length < 9 ? <button type="button" className="uploader-add" onClick={() => fileInputRef.current?.click()}><span className="uploader-add__plus">+</span><strong>{t.uploadCardPrimary}</strong><small>{t.uploadCardSecondary}</small></button> : null}<div className="uploader-grid">{images.map((image, index) => <article className="uploader-tile" key={`${image.url}-${index}`}><img src={image.url} alt={`${t.uploadedPreviewAlt} ${index + 1}`} /><button type="button" className="uploader-remove" onClick={() => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))}>{t.remove}</button></article>)}</div></div><p className="uploader-caption">{images.length > 0 ? t.selectedImages(images.length) : t.noImagesSelected}</p></div><div className="compose-shell__row"><button className="solid-link solid-link--button" type="submit" disabled={status === "loading"}>{status === "loading" ? t.publishing : t.publish}</button></div></form></div></section>;
 }
 
-type ProfilePageProps = { currentUser: User | null; posts: PostItem[]; language: Language; t: Dictionary };
-function ProfilePage({ currentUser, posts, language, t }: ProfilePageProps) {
-  if (!currentUser) return <section className="auth-page"><div className="form-shell"><p className="eyebrow">{t.profileEyebrow}</p><h1>{t.noSessionTitle}</h1><p className="status-copy">{t.noSessionHint}</p></div></section>;
-  return <section className="profile-page"><div className="profile-head"><span className="avatar-orb avatar-orb--large">{getInitials(currentUser.displayName)}</span><div><p className="eyebrow">{t.profileEyebrow}</p><h1>{currentUser.displayName}</h1><p className="status-copy">{currentUser.email}</p></div></div><div className="profile-stats"><div><span>{t.posts}</span><strong>{posts.length}</strong></div><div><span>{t.joined}</span><strong>{formatShortDate(currentUser.createdAt, language)}</strong></div></div><div className="feed-list">{posts.length === 0 ? <div className="empty-state"><p className="eyebrow">{t.emptyArchiveEyebrow}</p><h2>{t.emptyArchiveTitle}</h2><p>{t.emptyArchiveBody}</p></div> : posts.map((post) => <article className="post-row" key={post.id}><div className="post-row__meta"><span className="avatar-orb">{getInitials(post.author.displayName)}</span><div className="post-row__author"><strong>{post.author.displayName}</strong><p>{formatTimestamp(post.createdAt, language)}</p></div></div>{post.content ? <p className="post-row__content">{post.content}</p> : null}{post.images.length > 0 ? <div className={`post-row__images post-row__images--${post.images.length > 1 ? "grid" : "single"}`}>{post.images.map((image) => <img key={image.id} src={image.url} alt={t.postMediaAlt} loading="lazy" />)}</div> : null}</article>)}</div></section>;
+function ProfilePage({ currentUser, posts, language, t }: { currentUser: User | null; posts: PostItem[]; language: Language; t: Dictionary }) {
+  if (!currentUser) return <section className="auth-page"><div className="form-shell"><p className="eyebrow">{t.profileEyebrow}</p><h1>{t.noSessionTitle}</h1><p className="status-copy">{t.noSessionHint}</p><Link className="solid-link" to="/login">{t.goToLogin}</Link></div></section>;
+  return <section className="profile-page"><div className="profile-hero"><div className="profile-hero__identity">{currentUser.avatarUrl ? <img className="avatar-orb avatar-orb--image avatar-orb--hero" src={currentUser.avatarUrl} alt={currentUser.displayName} /> : <div className="avatar-orb avatar-orb--hero">{getInitials(currentUser.displayName)}</div>}<div><p className="eyebrow">{t.profileEyebrow}</p><h1>{currentUser.displayName}</h1><p>{currentUser.email}</p></div></div><div className="profile-stats"><div className="stat-chip"><span>{t.posts}</span><strong>{posts.length}</strong></div><div className="stat-chip"><span>{t.joined}</span><strong>{formatShortDate(currentUser.createdAt, language)}</strong></div></div></div>{posts.length === 0 ? <div className="empty-state"><p className="eyebrow">{t.emptyArchiveEyebrow}</p><h2>{t.emptyArchiveTitle}</h2><p>{t.emptyArchiveBody}</p></div> : <div className="feed-list">{posts.map((post) => <article className="post-row" key={post.id}><div className="post-row__meta"><strong>{formatTimestamp(post.createdAt, language)}</strong></div>{post.content ? <p className="post-row__content">{post.content}</p> : null}{post.images.length > 0 ? <PostImageGallery images={post.images} postLabel={currentUser.displayName} t={t} /> : null}</article>)}</div>}</section>;
 }
 
-type RitualPageProps = { mode: ModeName; count: number; state: RequestState; bursts: Burst[]; onTap: () => void; onSwitch: (mode: ModeName) => void; t: Dictionary };
-function RitualPage({ mode, count, state, bursts, onTap, onSwitch, t }: RitualPageProps) {
+function RitualPage({ mode, count, state, bursts, onTap, onSwitch, t }: { mode: ModeName; count: number; state: RequestState; bursts: Burst[]; onTap: () => void; onSwitch: (mode: ModeName) => void; t: Dictionary }) {
   const isLonging = mode === "longing";
-  return <section className={`ritual-page ritual-page--${mode}`}><div className="ritual-copy"><p className="eyebrow">{isLonging ? t.longingMode : t.zenMode}</p><h2>{isLonging ? t.longingTitle : t.zenTitle}</h2></div><div className="ritual-surface"><span className="ritual-surface__label">{isLonging ? t.longingCount : t.painReduced}</span><strong className="ritual-surface__value">{count}</strong>{isLonging ? <button className="ritual-action ritual-action--longing" type="button" onClick={onTap}>{t.count}</button> : <button className="mokugyo" type="button" onClick={onTap} aria-label={t.strikeMokugyo}><span className="mokugyo__ring" aria-hidden="true" /><span className="mokugyo__drum" aria-hidden="true" /><span className="mokugyo__mallet" aria-hidden="true" /></button>}<small className="ritual-surface__hint" data-state={state}>{state === "error" ? t.tryAgain : t.saved}</small><div className="burst-layer" aria-hidden="true">{bursts.map((item) => <span className="burst" key={item.id} style={{ left: item.x, top: item.y }}>{item.label}</span>)}</div></div><div className="ritual-links"><button className={`ritual-links__item ${isLonging ? "is-active" : ""}`} type="button" onClick={() => onSwitch("longing")}>{t.longing}</button><button className={`ritual-links__item ${!isLonging ? "is-active" : ""}`} type="button" onClick={() => onSwitch("zen")}>{t.zen}</button></div></section>;
+  return <section className="ritual-page"><div className="ritual-links"><button className={`ritual-links__item ${isLonging ? "is-active" : ""}`} type="button" onClick={() => onSwitch("longing")}>{t.longingMode}</button><button className={`ritual-links__item ${!isLonging ? "is-active" : ""}`} type="button" onClick={() => onSwitch("zen")}>{t.zenMode}</button></div><div className="ritual-card"><p className="eyebrow">{isLonging ? t.longingMode : t.zenMode}</p><h1>{isLonging ? t.longingTitle : t.zenTitle}</h1><p className="ritual-card__count"><span>{isLonging ? t.longingCount : t.painReduced}</span><strong>{count}</strong></p><div className="ritual-stage">{bursts.map((burst) => <span key={burst.id} className="ritual-burst" style={{ left: burst.x, top: burst.y }}>{burst.label}</span>)}<button type="button" className={isLonging ? "ritual-action" : "mokugyo"} onClick={() => void onTap()} disabled={state === "loading"}>{state === "loading" ? t.working : isLonging ? t.count : t.strikeMokugyo}</button></div>{state === "error" ? <p className="status-copy">{t.tryAgain}</p> : null}{state === "success" ? <p className="status-copy">{t.saved}</p> : null}</div></section>;
 }
 
 export default function App() {
-  return <AppShell />;
+  return <BrowserRouter><AppShell /></BrowserRouter>;
 }
-
-
 
 

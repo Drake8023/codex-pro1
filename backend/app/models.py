@@ -28,7 +28,8 @@ class User(db.Model):
 
     posts = db.relationship("Post", back_populates="author", cascade="all, delete-orphan")
     post_likes = db.relationship("PostLike", back_populates="user", cascade="all, delete-orphan")
-    post_comments = db.relationship("PostComment", back_populates="author", cascade="all, delete-orphan")
+    post_comments = db.relationship("PostComment", foreign_keys="PostComment.user_id", back_populates="author", cascade="all, delete-orphan")
+    comment_replies = db.relationship("PostComment", foreign_keys="PostComment.reply_to_user_id", back_populates="reply_to_user")
     messages = db.relationship("Message", back_populates="sender", cascade="all, delete-orphan")
     conversation_participants = db.relationship("ConversationParticipant", back_populates="user", cascade="all, delete-orphan")
 
@@ -78,12 +79,17 @@ class PostComment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    parent_comment_id = db.Column(db.Integer, db.ForeignKey("post_comments.id"), nullable=True, index=True)
+    reply_to_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
     post = db.relationship("Post", back_populates="comments")
-    author = db.relationship("User", back_populates="post_comments")
+    author = db.relationship("User", foreign_keys=[user_id], back_populates="post_comments")
+    parent_comment = db.relationship("PostComment", remote_side=[id], back_populates="replies")
+    replies = db.relationship("PostComment", back_populates="parent_comment", cascade="all, delete-orphan", order_by="PostComment.created_at")
+    reply_to_user = db.relationship("User", foreign_keys=[reply_to_user_id], back_populates="comment_replies")
 
 
 class Conversation(db.Model):

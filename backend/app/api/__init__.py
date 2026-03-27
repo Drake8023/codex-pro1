@@ -10,7 +10,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import Conversation, ConversationParticipant, DemoCounter, Message, Post, PostComment, PostImage, PostLike, User
+from app.models import Conversation, ConversationParticipant, DemoCounter, Message, Post, PostComment, PostImage, PostLike, User, utcnow
 
 api_bp = Blueprint("api", __name__)
 
@@ -72,6 +72,9 @@ def _serialize_post_comment(comment: PostComment) -> dict[str, object]:
         "createdAt": comment.created_at.isoformat(),
         "updatedAt": comment.updated_at.isoformat(),
         "author": _serialize_user(comment.author),
+        "parentCommentId": comment.parent_comment_id,
+        "replyToUser": _serialize_user(comment.reply_to_user) if comment.reply_to_user is not None else None,
+        "replies": [_serialize_post_comment(reply) for reply in comment.replies],
     }
 
 
@@ -139,6 +142,37 @@ def _get_post_or_404(post_id: int) -> Post | tuple[object, int]:
     if post is None:
         return _json_error("Post not found", 404)
     return post
+
+
+def _get_post_comment_or_404(comment_id: int) -> PostComment | tuple[object, int]:
+    comment = db.session.execute(
+        db.select(PostComment)
+        .options(
+            selectinload(PostComment.author),
+            selectinload(PostComment.reply_to_user),
+            selectinload(PostComment.replies).selectinload(PostComment.author),
+            selectinload(PostComment.replies).selectinload(PostComment.reply_to_user),
+        )
+        .where(PostComment.id == comment_id)
+    ).scalar_one_or_none()
+    if comment is None:
+        return _json_error("Comment not found", 404)
+    return comment
+
+
+def _get_post_comment_threads(post_id: int) -> list[PostComment]:
+    comments = db.session.execute(
+        db.select(PostComment)
+        .options(
+            selectinload(PostComment.author),
+            selectinload(PostComment.reply_to_user),
+            selectinload(PostComment.replies).selectinload(PostComment.author),
+            selectinload(PostComment.replies).selectinload(PostComment.reply_to_user),
+        )
+        .where(PostComment.post_id == post_id, PostComment.parent_comment_id.is_(None))
+        .order_by(PostComment.created_at.asc())
+    ).scalars().all()
+    return comments
 
 
 def _get_conversation_for_user_or_404(conversation_id: int, current_user: User) -> Conversation | tuple[object, int]:
@@ -301,14 +335,7 @@ def get_post_comments(post_id: int):
     post = _get_post_or_404(post_id)
     if isinstance(post, tuple):
         return post
-
-    comments = db.session.execute(
-        db.select(PostComment)
-        .options(selectinload(PostComment.author))
-        .where(PostComment.post_id == post.id)
-        .order_by(PostComment.created_at.asc())
-    ).scalars().all()
-    return jsonify(comments=[_serialize_post_comment(comment) for comment in comments])
+    return jsonify(comments=[_serialize_post_comment(comment) for comment in _get_post_comment_threads(post.id)])
 
 
 @api_bp.post("/posts/<int:post_id>/comments")
@@ -320,16 +347,40 @@ def create_post_comment(current_user: User, post_id: int):
 
     data = request.get_json(silent=True) or {}
     content = str(data.get("content", "")).strip()
+    parent_comment_id = data.get("parentCommentId")
+    reply_to_user_id = data.get("replyToUserId")
     if not content:
         return _json_error("Comment cannot be empty", 400)
 
-    comment = PostComment(post=post, author=current_user, content=content)
+    parent_comment: PostComment | None = None
+    if parent_comment_id is not None:
+        if not isinstance(parent_comment_id, int):
+            return _json_error("parentCommentId must be an integer", 400)
+        found_comment = _get_post_comment_or_404(parent_comment_id)
+        if isinstance(found_comment, tuple):
+            return found_comment
+        parent_comment = found_comment
+        if parent_comment.post_id != post.id:
+            return _json_error("Comment does not belong to this post", 400)
+        if parent_comment.parent_comment_id is not None:
+            return _json_error("Only two levels of comments are supported", 400)
+
+    reply_to_user: User | None = None
+    if parent_comment is not None:
+        target_user_id = parent_comment.user_id if reply_to_user_id is None else reply_to_user_id
+        if not isinstance(target_user_id, int):
+            return _json_error("replyToUserId must be an integer", 400)
+        reply_to_user = db.session.get(User, target_user_id)
+        if reply_to_user is None:
+            return _json_error("Reply target user not found", 404)
+
+    comment = PostComment(post=post, author=current_user, content=content, parent_comment=parent_comment, reply_to_user=reply_to_user)
     db.session.add(comment)
     db.session.commit()
 
-    fresh_comment = db.session.execute(
-        db.select(PostComment).options(selectinload(PostComment.author)).where(PostComment.id == comment.id)
-    ).scalar_one()
+    fresh_comment = _get_post_comment_or_404(comment.id)
+    if isinstance(fresh_comment, tuple):
+        return fresh_comment
     comment_count = db.session.execute(db.select(db.func.count(PostComment.id)).where(PostComment.post_id == post.id)).scalar_one()
     return jsonify(message="Comment created", comment=_serialize_post_comment(fresh_comment), commentCount=comment_count), 201
 
@@ -431,7 +482,7 @@ def create_message(current_user: User, conversation_id: int):
         return _json_error("Message cannot be empty", 400)
 
     message = Message(conversation=conversation, sender=current_user, content=content)
-    conversation.updated_at = message.created_at
+    conversation.updated_at = utcnow()
     db.session.add(message)
     db.session.commit()
 

@@ -3,6 +3,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from flask import Flask
+from sqlalchemy import inspect, text
 
 from app.api import api_bp
 from app.extensions import db
@@ -18,6 +19,26 @@ def _ensure_counter(counter_id: int, default_count: int = 0) -> DemoCounter:
         counter = DemoCounter(id=counter_id, count=default_count)
         db.session.add(counter)
     return counter
+
+
+def _ensure_post_comment_schema() -> None:
+    inspector = inspect(db.engine)
+    if "post_comments" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("post_comments")}
+    statements: list[str] = []
+
+    if "parent_comment_id" not in columns:
+        statements.append("ALTER TABLE post_comments ADD COLUMN parent_comment_id INTEGER")
+    if "reply_to_user_id" not in columns:
+        statements.append("ALTER TABLE post_comments ADD COLUMN reply_to_user_id INTEGER")
+
+    for statement in statements:
+        db.session.execute(text(statement))
+
+    if statements:
+        db.session.commit()
 
 
 def create_app() -> Flask:
@@ -48,6 +69,7 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
+        _ensure_post_comment_schema()
         _ensure_counter(LONGING_COUNTER_ID, 0)
         _ensure_counter(ZEN_COUNTER_ID, 0)
         db.session.commit()
