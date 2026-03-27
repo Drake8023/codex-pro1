@@ -9,4 +9,8 @@ export type NotificationItem = {
   actor: User;
   postId: number;
   commentId: number | null;
+  targetCommentId: number | null;
+  commentExcerpt: string | null;
+  targetCommentExcerpt: string | null;
+  postExcerpt: string | null;
 };

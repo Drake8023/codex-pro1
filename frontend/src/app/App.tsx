@@ -13,6 +13,7 @@ import { Avatar } from "../shared/components/Avatar";
 import { Button } from "../shared/components/Button";
 import { useTheme } from "./providers/ThemeProvider";
 import { useSession, useLogout } from "../features/auth/hooks/useSession";
+import { useNotifications } from "../features/notifications/hooks/useNotifications";
 import { useHealth } from "../shared/hooks/useHealth";
 
 function SettingsMenu() {
@@ -65,6 +66,8 @@ function AppChrome({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, language } = useSession();
+  const notificationsQuery = useNotifications(Boolean(currentUser));
+  const unreadCount = notificationsQuery.data?.unreadCount ?? 0;
   const logout = useLogout();
   const t = dictionaries[language];
   const isRitual = location.pathname.startsWith("/ritual/");
@@ -78,14 +81,22 @@ function AppChrome({ children }: { children: ReactNode }) {
         <nav className="app-nav" aria-label="Primary navigation">
           <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/" end>{t.navFeed}</NavLink>
           <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/create">{t.navCreate}</NavLink>
-          {currentUser ? <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/profile">{t.navProfile}</NavLink> : null}
+          {currentUser ? (
+            <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/profile">
+              <Badge dot={unreadCount > 0} offset={[6, 2]}>
+                <span className="app-nav__badge">{t.navProfile}</span>
+              </Badge>
+            </NavLink>
+          ) : null}
         </nav>
         <div className="app-topbar__actions">
           <SettingsMenu />
           {currentUser ? (
             <div className="app-topbar__session">
               <Link className="session-link glass-pill" to="/profile">
-                <Avatar user={currentUser} size="sm" />
+                <Badge dot={unreadCount > 0} offset={[2, 2]}>
+                  <Avatar user={currentUser} size="sm" />
+                </Badge>
                 <span>{currentUser.displayName}</span>
               </Link>
               <Button variant="ghost" size="sm" onClick={() => logout.mutate(undefined, { onSuccess: () => navigate("/") })}>{t.logout}</Button>

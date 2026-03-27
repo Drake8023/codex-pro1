@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CommentOutlined, HeartFilled, HeartOutlined, MessageOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { CommentOutlined, HeartFilled, HeartOutlined } from "@ant-design/icons";
 import { Avatar } from "../../../shared/components/Avatar";
 import { StatusText } from "../../../shared/components/StatusText";
 import { ActionButton } from "../../../shared/components/ActionButton";
@@ -17,12 +17,19 @@ type PostCardProps = {
   currentUserId?: number;
   highlight?: boolean;
   autoOpenComments?: boolean;
+  targetCommentId?: number;
 };
 
-export function PostCard({ post, t, language, currentUserId, highlight = false, autoOpenComments = false }: PostCardProps) {
+export function PostCard({ post, t, language, currentUserId, highlight = false, autoOpenComments = false, targetCommentId }: PostCardProps) {
   const [likeError, setLikeError] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(autoOpenComments);
   const toggleLike = useToggleLike();
+
+  useEffect(() => {
+    if (autoOpenComments) {
+      setCommentsOpen(true);
+    }
+  }, [autoOpenComments]);
 
   const handleLike = async () => {
     if (!currentUserId) {
@@ -77,7 +84,7 @@ export function PostCard({ post, t, language, currentUserId, highlight = false, 
         />
       </div>
       {likeError ? <StatusText>{likeError}</StatusText> : null}
-      <CommentsPanel postId={post.id} t={t} language={language} isOpen={commentsOpen} />
+      <CommentsPanel postId={post.id} t={t} language={language} isOpen={commentsOpen} targetCommentId={targetCommentId} />
     </article>
   );
 }

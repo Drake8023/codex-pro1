@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../../shared/components/Button";
 import { useSession } from "../../auth/hooks/useSession";
 import { StatusText } from "../../../shared/components/StatusText";
@@ -13,6 +13,7 @@ type CommentsPanelProps = {
   t: Dictionary;
   language: Language;
   isOpen: boolean;
+  targetCommentId?: number;
 };
 
 type CommentItemProps = {
@@ -21,11 +22,14 @@ type CommentItemProps = {
   language: Language;
   onReply: (target: ReplyTarget) => void;
   canReply: boolean;
+  targetCommentId?: number;
 };
 
-function CommentItem({ comment, t, language, onReply, canReply }: CommentItemProps) {
+function CommentItem({ comment, t, language, onReply, canReply, targetCommentId }: CommentItemProps) {
+  const isTarget = comment.id === targetCommentId;
+
   return (
-    <div className={`comment-item ${comment.parentCommentId ? "comment-item--reply" : ""}`}>
+    <div id={`comment-${comment.id}`} className={`comment-item ${comment.parentCommentId ? "comment-item--reply" : ""} ${isTarget ? "is-target" : ""}`.trim()}>
       <div className="comment-item__head">
         <div className="comment-item__meta">
           <Avatar user={comment.author} size="sm" />
@@ -47,7 +51,7 @@ function CommentItem({ comment, t, language, onReply, canReply }: CommentItemPro
       {comment.replies.length > 0 ? (
         <div className="comment-item__replies">
           {comment.replies.map((reply) => (
-            <CommentItem key={reply.id} comment={reply} t={t} language={language} onReply={onReply} canReply={canReply} />
+            <CommentItem key={reply.id} comment={reply} t={t} language={language} onReply={onReply} canReply={canReply} targetCommentId={targetCommentId} />
           ))}
         </div>
       ) : null}
@@ -55,13 +59,25 @@ function CommentItem({ comment, t, language, onReply, canReply }: CommentItemPro
   );
 }
 
-export function CommentsPanel({ postId, t, language, isOpen }: CommentsPanelProps) {
+export function CommentsPanel({ postId, t, language, isOpen, targetCommentId }: CommentsPanelProps) {
   const [draft, setDraft] = useState("");
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const { currentUser } = useSession();
   const commentsQuery = usePostComments(postId, isOpen);
   const createComment = useCreateComment(postId);
   const comments = commentsQuery.data?.comments ?? [];
+
+  useEffect(() => {
+    if (!isOpen || !targetCommentId || comments.length === 0) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`comment-${targetCommentId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [comments, isOpen, targetCommentId]);
 
   const handleSubmit = async () => {
     const content = draft.trim();
@@ -85,7 +101,15 @@ export function CommentsPanel({ postId, t, language, isOpen }: CommentsPanelProp
       {comments.length > 0 ? (
         <div className="comments-panel__list">
           {comments.map((comment) => (
-            <CommentItem key={comment.id} comment={comment} t={t} language={language} canReply={Boolean(currentUser)} onReply={setReplyTarget} />
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              t={t}
+              language={language}
+              canReply={Boolean(currentUser)}
+              onReply={setReplyTarget}
+              targetCommentId={targetCommentId}
+            />
           ))}
         </div>
       ) : null}

@@ -12,6 +12,7 @@ export function FeedPage({ t, language }: { t: Dictionary; language: Language })
   const { currentUser } = useSession();
   const [searchParams] = useSearchParams();
   const highlightPostId = Number(searchParams.get("post") ?? 0);
+  const highlightCommentId = Number(searchParams.get("comment") ?? 0);
   const openComments = searchParams.get("comments") === "1";
   const posts = useMemo(() => postsQuery.data?.posts ?? [], [postsQuery.data?.posts]);
 
@@ -41,6 +42,7 @@ export function FeedPage({ t, language }: { t: Dictionary; language: Language })
             currentUserId={currentUser?.id}
             highlight={post.id === highlightPostId}
             autoOpenComments={openComments && post.id === highlightPostId}
+            targetCommentId={post.id === highlightPostId && highlightCommentId > 0 ? highlightCommentId : undefined}
           />
         ))}
       </div>

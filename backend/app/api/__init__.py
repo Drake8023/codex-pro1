@@ -151,6 +151,13 @@ def _serialize_message(message: Message) -> dict[str, object]:
     }
 
 
+def _excerpt(value: str, limit: int = 120) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[: limit - 1].rstrip()}?"
+
+
 def _serialize_notification(notification: Notification) -> dict[str, object]:
     actor_name = notification.actor.display_name
     if notification.kind == "like":
@@ -159,6 +166,11 @@ def _serialize_notification(notification: Notification) -> dict[str, object]:
         body = f"{actor_name} replied to your comment"
     else:
         body = f"{actor_name} commented on your post"
+
+    comment_excerpt = _excerpt(notification.comment.content) if notification.comment is not None else None
+    target_comment = notification.comment.parent_comment if notification.kind == "reply" and notification.comment is not None else None
+    target_comment_excerpt = _excerpt(target_comment.content) if target_comment is not None else None
+    post_excerpt = _excerpt(notification.post.content) if notification.post.content else None
 
     return {
         "id": notification.id,
@@ -169,6 +181,10 @@ def _serialize_notification(notification: Notification) -> dict[str, object]:
         "actor": _serialize_user(notification.actor),
         "postId": notification.post_id,
         "commentId": notification.comment_id,
+        "targetCommentId": target_comment.id if target_comment is not None else notification.comment_id,
+        "commentExcerpt": comment_excerpt,
+        "targetCommentExcerpt": target_comment_excerpt,
+        "postExcerpt": post_excerpt,
     }
 
 
@@ -642,7 +658,11 @@ def upload_images(_current_user: User):
 def get_notifications(current_user: User):
     notifications = db.session.execute(
         db.select(Notification)
-        .options(selectinload(Notification.actor))
+        .options(
+            selectinload(Notification.actor),
+            selectinload(Notification.post),
+            selectinload(Notification.comment).selectinload(PostComment.parent_comment),
+        )
         .where(Notification.user_id == current_user.id)
         .order_by(Notification.created_at.desc())
         .limit(50)
