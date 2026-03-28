@@ -3,6 +3,7 @@ import { PlusOutlined } from "@ant-design/icons";
 import { Button } from "../../../shared/components/Button";
 import type { Dictionary } from "../../../i18n";
 import type { UploadedImage } from "../types";
+import { IMAGE_UPLOAD_ACCEPT } from "../constants";
 
 export function ImageUploader({ images, onUpload, onRemove, t, disabled }: { images: UploadedImage[]; onUpload: (files: File[]) => Promise<void>; onRemove: (index: number) => void; t: Dictionary; disabled?: boolean }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -21,7 +22,7 @@ export function ImageUploader({ images, onUpload, onRemove, t, disabled }: { ima
         <span>{t.addImages}</span>
         <small>{t.uploadTip}</small>
       </div>
-      <input ref={inputRef} className="uploader__input" type="file" accept="image/*" multiple onChange={(event) => void handleChange(event)} />
+      <input ref={inputRef} className="uploader__input" type="file" accept={IMAGE_UPLOAD_ACCEPT} multiple onChange={(event) => void handleChange(event)} />
       <div className="uploader__grid uploader__grid--composer">
         {images.length < 9 ? (
           <Button variant="ghost" className="uploader__add" disabled={disabled} onClick={() => inputRef.current?.click()} icon={<PlusOutlined />}>

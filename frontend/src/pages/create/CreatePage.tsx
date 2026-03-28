@@ -31,8 +31,8 @@ export function CreatePage({ t }: { t: Dictionary }) {
     try {
       const result = await uploadImages.mutateAsync(nextFiles);
       setImages((current) => [...current, ...result.images]);
-    } catch {
-      setStatus(t.uploadFailed);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : t.uploadFailed);
     }
   };
 

@@ -50,7 +50,6 @@ def create_app() -> Flask:
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
-    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
     database_url = os.getenv("DATABASE_URL")
     if database_url:

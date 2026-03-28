@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from functools import wraps
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
 from flask import Blueprint, Response, current_app, jsonify, redirect, request, send_from_directory, session
+from PIL import Image
+from pillow_heif import register_heif_opener
 from sqlalchemy.orm import selectinload
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -13,10 +16,23 @@ from app.extensions import db
 from app.models import Conversation, ConversationParticipant, DemoCounter, Message, Notification, Post, PostComment, PostImage, PostLike, User, utcnow
 
 api_bp = Blueprint("api", __name__)
+register_heif_opener()
 
 LONGING_COUNTER_ID = 1
 ZEN_COUNTER_ID = 2
-ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "avif", "jfif", "heic", "heif"}
+ALLOWED_IMAGE_MIME_TYPES = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/pjpeg": "jpg",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/avif": "avif",
+    "image/heic": "heic",
+    "image/heif": "heif",
+    "image/heic-sequence": "heic",
+    "image/heif-sequence": "heif",
+}
 AVATAR_PRESETS = {
     "aurora": {
         "bg": ("#7c9dff", "#ffd4b6"),
@@ -66,6 +82,30 @@ def _avatar_preset_svg(preset_id: str) -> str | None:
 
 def _json_error(message: str, status: int):
     return jsonify(message=message), status
+
+
+def _resolve_upload_extension(file) -> str | None:
+    original_name = file.filename or ""
+    extension = Path(original_name).suffix.lower().lstrip(".")
+    mimetype = (file.mimetype or "").lower()
+
+    if extension in ALLOWED_IMAGE_EXTENSIONS:
+        return extension
+
+    return ALLOWED_IMAGE_MIME_TYPES.get(mimetype)
+
+
+def _save_uploaded_file(file, destination: Path, extension: str) -> None:
+    if extension not in {"heic", "heif"}:
+        file.save(destination)
+        return
+
+    file.stream.seek(0)
+    with Image.open(file.stream) as image:
+        converted = image.convert("RGB")
+        buffer = BytesIO()
+        converted.save(buffer, format="JPEG", quality=92)
+        destination.write_bytes(buffer.getvalue())
 
 
 def _get_or_create_counter(counter_id: int) -> DemoCounter:
@@ -641,13 +681,17 @@ def upload_images(_current_user: User):
 
     for file in files:
         original_name = file.filename or ""
-        extension = Path(original_name).suffix.lower().lstrip(".")
-        if not original_name or extension not in ALLOWED_IMAGE_EXTENSIONS:
-            return _json_error("Only png, jpg, jpeg, gif, and webp images are allowed", 400)
+        extension = _resolve_upload_extension(file)
+        if not original_name or extension is None:
+            return _json_error("Only png, jpg, jpeg, gif, webp, avif, jfif, heic, and heif images are allowed", 400)
 
         stem = secure_filename(Path(original_name).stem) or "image"
-        stored_name = f"{uuid4().hex}-{stem}.{extension}"
-        file.save(upload_dir / stored_name)
+        stored_extension = "jpg" if extension in {"heic", "heif"} else extension
+        stored_name = f"{uuid4().hex}-{stem}.{stored_extension}"
+        try:
+            _save_uploaded_file(file, upload_dir / stored_name, extension)
+        except Exception:
+            return _json_error("Image conversion failed. Please try another photo.", 400)
         saved_images.append({"name": stored_name, "url": f"/api/uploads/{stored_name}"})
 
     return jsonify(message="Images uploaded", images=saved_images), 201

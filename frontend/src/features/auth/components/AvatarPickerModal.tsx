@@ -9,6 +9,7 @@ import type { User } from "../types";
 import { avatarPresetIds, getAvatarPresetUrl } from "../avatarPresets";
 import { useUpdateAvatar } from "../hooks/useSession";
 import { useImageUpload } from "../../uploads/hooks/useImageUpload";
+import { IMAGE_UPLOAD_ACCEPT } from "../../uploads/constants";
 
 export function AvatarPickerModal({ open, onClose, user, t }: { open: boolean; onClose: () => void; user: User; t: Dictionary }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -36,8 +37,8 @@ export function AvatarPickerModal({ open, onClose, user, t }: { open: boolean; o
       if (!uploaded) throw new Error("missing image");
       await updateAvatar.mutateAsync(uploaded.url);
       onClose();
-    } catch {
-      setStatus(t.avatarUpdateFailed);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : t.avatarUpdateFailed);
     }
   };
 
@@ -58,7 +59,7 @@ export function AvatarPickerModal({ open, onClose, user, t }: { open: boolean; o
               {t.uploadAvatar}
             </Button>
           </div>
-          <input ref={inputRef} type="file" accept="image/*" className="avatar-picker__input" onChange={(event) => { void handleUpload(event.target.files); event.target.value = ""; }} />
+          <input ref={inputRef} type="file" accept={IMAGE_UPLOAD_ACCEPT} className="avatar-picker__input" onChange={(event) => { void handleUpload(event.target.files); event.target.value = ""; }} />
           <div className="avatar-picker__grid">
             {avatarPresetIds.map((presetId) => {
               const presetUrl = getAvatarPresetUrl(presetId);
