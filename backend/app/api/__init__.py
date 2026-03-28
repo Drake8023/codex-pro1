@@ -414,6 +414,37 @@ def update_profile_avatar(current_user: User):
     return jsonify(message="Avatar updated", user=_serialize_user(current_user))
 
 
+@api_bp.put("/profile/bio")
+@login_required
+def update_profile_bio(current_user: User):
+    data = request.get_json(silent=True) or {}
+    bio = str(data.get("bio", "")).strip() or None
+    current_user.bio = bio
+    db.session.commit()
+    return jsonify(message="Bio updated", user=_serialize_user(current_user))
+
+
+@api_bp.get("/users/<int:user_id>")
+def get_user_profile(user_id: int):
+    current_user = _get_current_user()
+    user = db.session.get(User, user_id)
+    if user is None:
+        return _json_error("User not found", 404)
+
+    posts = db.session.execute(
+        db.select(Post)
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.images),
+            selectinload(Post.likes).selectinload(PostLike.user),
+            selectinload(Post.comments),
+        )
+        .where(Post.user_id == user_id)
+        .order_by(Post.created_at.desc())
+    ).scalars().all()
+    return jsonify(user=_serialize_user(user), posts=[_serialize_post(post, current_user) for post in posts])
+
+
 @api_bp.get("/posts")
 def get_posts():
     current_user = _get_current_user()

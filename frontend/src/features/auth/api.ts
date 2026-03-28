@@ -20,3 +20,11 @@ export function logout() {
 export function updateAvatar(avatarUrl: string | null) {
   return apiRequest<{ user: User }>("/api/profile/avatar", { method: "PUT", body: JSON.stringify({ avatarUrl }) });
 }
+
+export function updateBio(bio: string | null) {
+  return apiRequest<{ user: User }>("/api/profile/bio", { method: "PUT", body: JSON.stringify({ bio }) });
+}
+
+export function getUserProfile(userId: number) {
+  return apiRequest<{ user: User; posts: import("../posts/types").PostItem[] }>(`/api/users/${userId}`);
+}

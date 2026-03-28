@@ -9,6 +9,7 @@ import { CommentsPanel } from "../../comments/components/CommentsPanel";
 import type { Dictionary, Language } from "../../../i18n";
 import { formatTimestamp } from "../../../shared/lib/date";
 import type { PostItem } from "../types";
+import { UserLink } from "../../../shared/components/UserLink";
 
 type PostCardProps = {
   post: PostItem;
@@ -48,9 +49,13 @@ export function PostCard({ post, t, language, currentUserId, highlight = false, 
     <article className={`post-card glass-panel ${highlight ? "post-card--highlight" : ""}`} id={`post-${post.id}`}>
       <div className="post-card__header">
         <div className="post-card__author">
-          <Avatar user={post.author} size="md" />
-          <div>
+          <UserLink user={post.author} className="user-link user-link--avatar">
+            <Avatar user={post.author} size="md" />
+          </UserLink>
+          <div className="post-card__author-copy">
+            <UserLink user={post.author} className="user-link user-link--name">
             <strong>{post.author.displayName}</strong>
+            </UserLink>
             <span>{formatTimestamp(post.createdAt, language)}</span>
           </div>
         </div>

@@ -7,6 +7,7 @@ import type { Dictionary, Language } from "../../../i18n";
 import { formatTimestamp } from "../../../shared/lib/date";
 import { useCreateComment, usePostComments } from "../hooks/usePostComments";
 import type { PostComment, ReplyTarget } from "../types";
+import { UserLink } from "../../../shared/components/UserLink";
 
 type CommentsPanelProps = {
   postId: number;
@@ -32,9 +33,13 @@ function CommentItem({ comment, t, language, onReply, canReply, targetCommentId 
     <div id={`comment-${comment.id}`} className={`comment-item ${comment.parentCommentId ? "comment-item--reply" : ""} ${isTarget ? "is-target" : ""}`.trim()}>
       <div className="comment-item__head">
         <div className="comment-item__meta">
-          <Avatar user={comment.author} size="sm" />
-          <div>
+          <UserLink user={comment.author} className="user-link user-link--avatar">
+            <Avatar user={comment.author} size="sm" />
+          </UserLink>
+          <div className="comment-item__meta-copy">
+            <UserLink user={comment.author} className="user-link user-link--name">
             <strong>{comment.author.displayName}</strong>
+            </UserLink>
             <span>{formatTimestamp(comment.createdAt, language)}</span>
           </div>
         </div>

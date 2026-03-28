@@ -208,6 +208,7 @@ img { display: block; max-width: 100%; }
 .post-card--highlight { outline: 1px solid color-mix(in srgb, var(--accent) 36%, transparent); }
 .post-card__header { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; }
 .post-card__author, .comment-item__meta { display: flex; align-items: center; gap: 0.75rem; }
+.post-card__author-copy, .comment-item__meta-copy { display: grid; gap: 0.08rem; }
 .post-card__author span, .comment-item__meta span { display: block; }
 .post-card__content, .comment-item__content, .notification-card__body p { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text); }
 .post-card__content { font-size: 1rem; line-height: 1.7; }
@@ -289,7 +290,18 @@ textarea { resize: vertical; min-height: 8rem; }
 .uploader__caption { font-size: 0.88rem; }
 
 .profile-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; }
+.profile-hero__slogan { color: var(--text); font-size: 1.02rem; font-weight: 600; }
 .profile-hero__stats { justify-content: flex-end; flex-wrap: wrap; align-items: stretch; }
+.profile-slogan-editor { display: grid; gap: 0.85rem; padding: 1rem 1.15rem; }
+.profile-slogan-editor__head,
+.profile-slogan-editor__footer { display: flex; justify-content: space-between; align-items: center; gap: 0.8rem; }
+.user-link { color: inherit; text-decoration: none; }
+.user-link--avatar { display: inline-flex; align-items: center; }
+.user-link--name strong { color: var(--text); }
+.user-link--name:hover strong,
+.user-link--avatar:hover .avatar {
+  opacity: 0.9;
+}
 .page--features { gap: 1rem; }
 .feature-overview { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr); gap: 1rem; }
 .feature-overview__panel { display: grid; gap: 1rem; padding: 1.15rem; border-radius: 24px; }
@@ -483,6 +495,11 @@ textarea { resize: vertical; min-height: 8rem; }
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
+  }
+  .profile-slogan-editor__head,
+  .profile-slogan-editor__footer {
+    display: grid;
+    justify-items: start;
   }
   .profile-messages-trigger {
     min-width: 0;

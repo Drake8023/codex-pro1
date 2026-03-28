@@ -155,6 +155,11 @@ export type Dictionary = {
   feedFeatureEntry: string;
   feedCreateEntry: string;
   feedMobileHint: string;
+  profileSloganTitle: string;
+  profileSloganHint: string;
+  profileSloganPlaceholder: string;
+  profileSloganSave: string;
+  profileSloganSaveFailed: string;
 };
 
 export const buildTag = "i18n-refresh-20260327-5";
@@ -315,6 +320,11 @@ export const dictionaries: Record<Language, Dictionary> = {
     feedFeatureEntry: "Open features",
     feedCreateEntry: "Start posting",
     feedMobileHint: "A quieter feed on top, quick moves below.",
+    profileSloganTitle: "Profile slogan",
+    profileSloganHint: "Use one short line to describe your page.",
+    profileSloganPlaceholder: "Write a short slogan or personal introduction.",
+    profileSloganSave: "Save slogan",
+    profileSloganSaveFailed: "Could not save slogan",
   },
   zh: {
     navFeed: "动态",
@@ -471,6 +481,11 @@ export const dictionaries: Record<Language, Dictionary> = {
     feedFeatureEntry: "打开功能中心",
     feedCreateEntry: "马上发布",
     feedMobileHint: "上面看动态，下面直接走快捷入口。",
+    profileSloganTitle: "主页标语",
+    profileSloganHint: "用一句短话介绍你的主页气质。",
+    profileSloganPlaceholder: "写一句简短的标语或个人简介。",
+    profileSloganSave: "保存标语",
+    profileSloganSaveFailed: "标语保存失败",
   },
 };
 

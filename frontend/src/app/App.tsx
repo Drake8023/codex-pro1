@@ -154,6 +154,7 @@ export default function App() {
         <Route path="/create" element={<CreatePage t={t} />} />
         <Route path="/features" element={<FeaturesPage t={t} />} />
         <Route path="/profile" element={<ProfilePage t={t} language={language} />} />
+        <Route path="/users/:userId" element={<ProfilePage t={t} language={language} />} />
         <Route path="/login" element={<LoginPage t={t} />} />
         <Route path="/register" element={<RegisterPage t={t} />} />
         <Route path="/ritual/:mode" element={<RitualPage t={t} />} />

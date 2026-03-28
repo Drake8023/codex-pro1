@@ -9,6 +9,7 @@ import { StatusText } from "../../../shared/components/StatusText";
 import { Button } from "../../../shared/components/Button";
 import { useMarkNotificationRead, useNotifications } from "../hooks/useNotifications";
 import type { NotificationItem } from "../types";
+import { UserLink } from "../../../shared/components/UserLink";
 
 function buildTargetHref(notification: NotificationItem) {
   const search = new URLSearchParams({ post: String(notification.postId), comments: "1" });
@@ -118,10 +119,14 @@ export function NotificationCenter({ t, language, enabled, showHeader = true }: 
               className="notification-card is-unread"
               onClick={() => void handleOpen(notification)}
             >
-              <Avatar user={notification.actor} size="sm" />
+              <UserLink user={notification.actor} className="user-link user-link--avatar" >
+                <Avatar user={notification.actor} size="sm" />
+              </UserLink>
               <div className="notification-card__body">
                 <div className="notification-card__meta">
-                  <strong>{notification.actor.displayName}</strong>
+                  <UserLink user={notification.actor} className="user-link user-link--name" >
+                    <strong>{notification.actor.displayName}</strong>
+                  </UserLink>
                   <span>{kindLabel[notification.kind]}</span>
                   <span>{formatTimestamp(notification.createdAt, language)}</span>
                 </div>
