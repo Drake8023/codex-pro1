@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { Dictionary, Language } from "../../i18n";
 import { EmptyState } from "../../shared/components/EmptyState";
 import { StatusText } from "../../shared/components/StatusText";
@@ -19,12 +19,17 @@ export function FeedPage({ t, language }: { t: Dictionary; language: Language })
   return (
     <section className="page page--feed">
       <div className="hero glass-panel glass-panel--strong">
-        <div>
+        <div className="hero__copy">
           <p className="eyebrow">{t.feedEyebrow}</p>
           <h1>{t.feedTitle}</h1>
+          <p className="hero__hint">{t.feedMobileHint}</p>
         </div>
         <div className="hero__meta">
           <StatusText>{currentUser ? t.signedInAs(currentUser.displayName) : t.joinPrompt}</StatusText>
+          <div className="hero__actions">
+            <Link className="app-link-button app-link-button--primary" to="/create">{t.feedCreateEntry}</Link>
+            <Link className="app-link-button" to="/features">{t.feedFeatureEntry}</Link>
+          </div>
         </div>
       </div>
       {postsQuery.isLoading ? <StatusText>{t.loadingPosts}</StatusText> : null}

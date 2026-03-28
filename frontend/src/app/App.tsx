@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react";
-import { CloudServerOutlined, GlobalOutlined, MenuOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
+import { AppstoreOutlined, CloudServerOutlined, GlobalOutlined, HomeOutlined, MenuOutlined, MoonOutlined, PlusOutlined, SunOutlined, UserOutlined } from "@ant-design/icons";
 import { Badge, Popover, Segmented } from "antd";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { FeedPage } from "../pages/feed/FeedPage";
 import { CreatePage } from "../pages/create/CreatePage";
+import { FeaturesPage } from "../pages/features/FeaturesPage";
 import { ProfilePage } from "../pages/profile/ProfilePage";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
@@ -62,6 +63,36 @@ function SettingsMenu() {
   );
 }
 
+function PrimaryNavigation({ unreadCount }: { unreadCount: number }) {
+  const { language } = useSession();
+  const t = dictionaries[language];
+
+  return (
+    <nav className="app-nav" aria-label="Primary navigation">
+      <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/" end>
+        <HomeOutlined className="app-nav__icon" />
+        <span>{t.navFeed}</span>
+      </NavLink>
+      <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/create">
+        <PlusOutlined className="app-nav__icon" />
+        <span>{t.navCreate}</span>
+      </NavLink>
+      <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/features">
+        <AppstoreOutlined className="app-nav__icon" />
+        <span>{t.navFeatures}</span>
+      </NavLink>
+      <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/profile">
+        <Badge dot={unreadCount > 0} offset={[4, 2]}>
+          <span className="app-nav__badge">
+            <UserOutlined className="app-nav__icon" />
+            <span>{t.navProfile}</span>
+          </span>
+        </Badge>
+      </NavLink>
+    </nav>
+  );
+}
+
 function AppChrome({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,18 +108,13 @@ function AppChrome({ children }: { children: ReactNode }) {
       <div className="app-shell__ambient app-shell__ambient--one" aria-hidden="true" />
       <div className="app-shell__ambient app-shell__ambient--two" aria-hidden="true" />
       <header className="app-topbar glass-panel glass-panel--strong">
-        <Link className="app-brand" to="/">Curator</Link>
-        <nav className="app-nav" aria-label="Primary navigation">
-          <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/" end>{t.navFeed}</NavLink>
-          <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/create">{t.navCreate}</NavLink>
-          {currentUser ? (
-            <NavLink className={({ isActive }) => `app-nav__link ${isActive ? "is-active" : ""}`} to="/profile">
-              <Badge dot={unreadCount > 0} offset={[6, 2]}>
-                <span className="app-nav__badge">{t.navProfile}</span>
-              </Badge>
-            </NavLink>
-          ) : null}
-        </nav>
+        <div className="app-topbar__brand">
+          <Link className="app-brand" to="/">Curator</Link>
+          <span className="app-brand__meta">{location.pathname.startsWith("/features") ? t.navFeatures : location.pathname.startsWith("/profile") ? t.navProfile : location.pathname.startsWith("/create") ? t.navCreate : t.navFeed}</span>
+        </div>
+        <div className="app-topbar__nav-desktop">
+          <PrimaryNavigation unreadCount={unreadCount} />
+        </div>
         <div className="app-topbar__actions">
           <SettingsMenu />
           {currentUser ? (
@@ -110,6 +136,9 @@ function AppChrome({ children }: { children: ReactNode }) {
         </div>
       </header>
       <div className={`app-content ${isRitual ? "app-content--ritual" : ""}`}>{children}</div>
+      <div className="app-mobile-dock glass-panel glass-panel--strong">
+        <PrimaryNavigation unreadCount={unreadCount} />
+      </div>
     </main>
   );
 }
@@ -123,6 +152,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<FeedPage t={t} language={language} />} />
         <Route path="/create" element={<CreatePage t={t} />} />
+        <Route path="/features" element={<FeaturesPage t={t} />} />
         <Route path="/profile" element={<ProfilePage t={t} language={language} />} />
         <Route path="/login" element={<LoginPage t={t} />} />
         <Route path="/register" element={<RegisterPage t={t} />} />

@@ -9,7 +9,17 @@ export async function apiRequest<T>(input: string, init: RequestInit = {}): Prom
     },
   });
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  let data: Record<string, unknown> = {};
+  if (text) {
+    try {
+      data = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      throw new Error("Invalid JSON response");
+    }
+  }
   if (!response.ok) {
     throw new Error(typeof data.message === "string" ? data.message : `HTTP ${response.status}`);
   }

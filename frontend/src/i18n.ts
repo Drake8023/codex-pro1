@@ -3,6 +3,7 @@
 export type Dictionary = {
   navFeed: string;
   navCreate: string;
+  navFeatures: string;
   navProfile: string;
   login: string;
   logout: string;
@@ -132,6 +133,28 @@ export type Dictionary = {
   messagePostContext: string;
   viewPost: string;
   likedBy: string;
+  featuresEyebrow: string;
+  featuresTitle: string;
+  featuresBody: string;
+  featureRitualsTitle: string;
+  featureRitualsBody: string;
+  featureLongingLabel: string;
+  featureZenLabel: string;
+  featureMoreTitle: string;
+  featureMoreBody: string;
+  featureHubLabel: string;
+  featureShortcutTitle: string;
+  featureShortcutBody: string;
+  featurePulseTitle: string;
+  featurePulseLonging: string;
+  featurePulseZen: string;
+  featurePulseNotifications: string;
+  featureExploreTitle: string;
+  featureExploreBody: string;
+  featurePlaceholderTag: string;
+  feedFeatureEntry: string;
+  feedCreateEntry: string;
+  feedMobileHint: string;
 };
 
 export const buildTag = "i18n-refresh-20260327-5";
@@ -140,6 +163,7 @@ export const dictionaries: Record<Language, Dictionary> = {
   en: {
     navFeed: "Feed",
     navCreate: "Create",
+    navFeatures: "Features",
     navProfile: "Profile",
     login: "Log in",
     logout: "Log out",
@@ -269,10 +293,33 @@ export const dictionaries: Record<Language, Dictionary> = {
     messagePostContext: "Post",
     viewPost: "View",
     likedBy: "Liked by",
+    featuresEyebrow: "Feature hub",
+    featuresTitle: "Keep the small tools together.",
+    featuresBody: "Use this area as the first-level entry for light features. Longing and Zen live here now, and more tools can be added later.",
+    featureRitualsTitle: "Ritual tools",
+    featureRitualsBody: "Two small counters for Longing and Zen are grouped here for quick access.",
+    featureLongingLabel: "Open Longing",
+    featureZenLabel: "Open Zen",
+    featureMoreTitle: "More tools later",
+    featureMoreBody: "Reserve this block for future mini features, experiments, and quick utilities.",
+    featureHubLabel: "Feature Center",
+    featureShortcutTitle: "Quick launch",
+    featureShortcutBody: "Jump straight into small tools without hunting through the feed.",
+    featurePulseTitle: "Live pulse",
+    featurePulseLonging: "Longing count",
+    featurePulseZen: "Zen hits",
+    featurePulseNotifications: "Unread messages",
+    featureExploreTitle: "Expansion slot",
+    featureExploreBody: "Keep space here for future rituals, utilities, and playful side tools.",
+    featurePlaceholderTag: "Coming next",
+    feedFeatureEntry: "Open features",
+    feedCreateEntry: "Start posting",
+    feedMobileHint: "A quieter feed on top, quick moves below.",
   },
   zh: {
     navFeed: "动态",
     navCreate: "发布",
+    navFeatures: "功能",
     navProfile: "我的",
     login: "登录",
     logout: "退出登录",
@@ -402,6 +449,28 @@ export const dictionaries: Record<Language, Dictionary> = {
     messagePostContext: "相关帖子",
     viewPost: "查看",
     likedBy: "点赞人",
+    featuresEyebrow: "功能中心",
+    featuresTitle: "把小功能集中收纳。",
+    featuresBody: "这里作为一级功能入口，思念和 Zen 先放在这里，后续更多小功能也继续往这里扩展。",
+    featureRitualsTitle: "仪式小功能",
+    featureRitualsBody: "把思念计数和 Zen 木鱼放在同一个入口里，方便后续继续扩充。",
+    featureLongingLabel: "打开思念",
+    featureZenLabel: "打开 Zen",
+    featureMoreTitle: "后续功能预留",
+    featureMoreBody: "这一块预留给后续的小工具、实验功能和轻量互动入口。",
+    featureHubLabel: "功能中心",
+    featureShortcutTitle: "快捷入口",
+    featureShortcutBody: "把轻量小功能集中放在这里，不需要再去动态里找。",
+    featurePulseTitle: "实时状态",
+    featurePulseLonging: "思念次数",
+    featurePulseZen: "Zen 次数",
+    featurePulseNotifications: "未读消息",
+    featureExploreTitle: "扩展预留位",
+    featureExploreBody: "后续的新仪式、小工具和有趣功能都继续塞到这里。",
+    featurePlaceholderTag: "即将加入",
+    feedFeatureEntry: "打开功能中心",
+    feedCreateEntry: "马上发布",
+    feedMobileHint: "上面看动态，下面直接走快捷入口。",
   },
 };
 
