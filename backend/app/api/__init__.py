@@ -20,6 +20,9 @@ register_heif_opener()
 
 LONGING_COUNTER_ID = 1
 ZEN_COUNTER_ID = 2
+UPLOAD_COMPRESSION_THRESHOLD_BYTES = 1_500_000
+UPLOAD_COMPRESSED_MAX_EDGE = 2560
+UPLOAD_COMPRESSED_WEBP_QUALITY = 86
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "avif", "jfif", "heic", "heif"}
 ALLOWED_IMAGE_MIME_TYPES = {
     "image/png": "png",
@@ -95,17 +98,61 @@ def _resolve_upload_extension(file) -> str | None:
     return ALLOWED_IMAGE_MIME_TYPES.get(mimetype)
 
 
-def _save_uploaded_file(file, destination: Path, extension: str) -> None:
-    if extension not in {"heic", "heif"}:
+def _get_uploaded_file_size(file) -> int:
+    stream = file.stream
+    position = stream.tell()
+    stream.seek(0, 2)
+    size = stream.tell()
+    stream.seek(position)
+    return size
+
+
+def _prepare_image_for_webp(image: Image.Image) -> Image.Image:
+    if image.mode in {"RGBA", "LA"}:
+        return image.convert("RGBA")
+    if image.mode == "P":
+        return image.convert("RGBA" if "transparency" in image.info else "RGB")
+    return image.convert("RGB")
+
+
+def _save_uploaded_file(file, upload_dir: Path, stem: str, extension: str) -> tuple[str, str]:
+    file_size = _get_uploaded_file_size(file)
+    stored_extension = "jpg" if extension in {"heic", "heif"} else extension
+    stored_name = f"{uuid4().hex}-{stem}.{stored_extension}"
+    destination = upload_dir / stored_name
+
+    if extension == "gif":
+        file.stream.seek(0)
         file.save(destination)
-        return
+        return stored_name, f"/api/uploads/{stored_name}"
+
+    should_compress = extension in {"heic", "heif"} or file_size > UPLOAD_COMPRESSION_THRESHOLD_BYTES
+    if not should_compress:
+        file.stream.seek(0)
+        file.save(destination)
+        return stored_name, f"/api/uploads/{stored_name}"
 
     file.stream.seek(0)
-    with Image.open(file.stream) as image:
-        converted = image.convert("RGB")
-        buffer = BytesIO()
-        converted.save(buffer, format="JPEG", quality=92)
-        destination.write_bytes(buffer.getvalue())
+    try:
+        with Image.open(file.stream) as image:
+            optimized = image.copy()
+    except Exception:
+        if extension in {"heic", "heif"}:
+            raise
+        file.stream.seek(0)
+        file.save(destination)
+        return stored_name, f"/api/uploads/{stored_name}"
+
+    if max(optimized.size) > UPLOAD_COMPRESSED_MAX_EDGE:
+        optimized.thumbnail((UPLOAD_COMPRESSED_MAX_EDGE, UPLOAD_COMPRESSED_MAX_EDGE), Image.Resampling.LANCZOS)
+
+    converted = _prepare_image_for_webp(optimized)
+    stored_extension = "webp"
+    stored_name = f"{uuid4().hex}-{stem}.{stored_extension}"
+    buffer = BytesIO()
+    converted.save(buffer, format="WEBP", quality=UPLOAD_COMPRESSED_WEBP_QUALITY, method=6)
+    (upload_dir / stored_name).write_bytes(buffer.getvalue())
+    return stored_name, f"/api/uploads/{stored_name}"
 
 
 def _get_or_create_counter(counter_id: int) -> DemoCounter:
@@ -717,13 +764,11 @@ def upload_images(_current_user: User):
             return _json_error("Only png, jpg, jpeg, gif, webp, avif, jfif, heic, and heif images are allowed", 400)
 
         stem = secure_filename(Path(original_name).stem) or "image"
-        stored_extension = "jpg" if extension in {"heic", "heif"} else extension
-        stored_name = f"{uuid4().hex}-{stem}.{stored_extension}"
         try:
-            _save_uploaded_file(file, upload_dir / stored_name, extension)
+            stored_name, stored_url = _save_uploaded_file(file, upload_dir, stem, extension)
         except Exception:
             return _json_error("Image conversion failed. Please try another photo.", 400)
-        saved_images.append({"name": stored_name, "url": f"/api/uploads/{stored_name}"})
+        saved_images.append({"name": stored_name, "url": stored_url})
 
     return jsonify(message="Images uploaded", images=saved_images), 201
 
